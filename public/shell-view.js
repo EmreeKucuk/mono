@@ -9,7 +9,7 @@ export function renderShell({state,user,view,toolbox,dirty,conflicted,offline,ty
       <div class="desk-picker">
         <label class="sr-only" for="desk-select">Masa seç</label>
         <select id="desk-select" aria-label="Masa seç">${state.desks.map(desk=>`<option value="${escape(desk.id)}" ${desk.id===state.activeDeskId?'selected':''}>${escape(desk.name)}</option>`).join('')}</select>
-        <div class="desk-actions"><button id="desk-add" aria-label="Yeni masa ekle">+ Yeni masa</button><button id="desk-rename" aria-label="Masa adını değiştir">✎</button></div>
+        <div class="desk-actions"><button id="desk-list" aria-label="Masa listesi ve silme">☷</button><button id="desk-add" aria-label="Yeni masa ekle">+ Yeni masa</button><button id="desk-rename" aria-label="Masa adını değiştir">✎</button></div>
       </div>
       <span class="eyebrow">ÇALIŞMA ALANI</span>
       <nav class="nav" aria-label="Ana menü">
@@ -20,7 +20,7 @@ export function renderShell({state,user,view,toolbox,dirty,conflicted,offline,ty
         ${view==='board'?`<label class="theme-picker">Grid düzeni
           <select id="grid-select" aria-label="Grid düzeni">
             <option value="2" ${state.gridColumns===2?'selected':''}>2 × 2</option>
-            <option value="3" ${state.gridColumns===3?'selected':''}>3 × 3</option>
+            <option value="3" ${state.gridColumns===3?'selected':''}>3 × 3</option>${[4,5,6].map(n=>`<option value="${n}" ${state.gridColumns===n?'selected':''}>${n} sütun</option>`).join('')}
           </select>
         </label>
         <label class="auto-layout"><input id="auto-arrange" type="checkbox" ${state.autoArrange?'checked':''}> Otomatik düzen</label>
@@ -33,7 +33,7 @@ export function renderShell({state,user,view,toolbox,dirty,conflicted,offline,ty
         <div class="sidebar-note">Kendi düzenin.<br>Kendi ritmin.</div>
         <button id="desktop-update" hidden class="wide" aria-live="polite">Güncellemeleri kontrol et</button>
         <button id="install" hidden class="wide">Masaüstüne yükle</button>
-        <div class="profile"><div class="avatar">${user?escape(user.email.slice(0,2).toUpperCase()):'M'}</div><div><span>${user?'Kişisel hesap':'Misafir alanı'}</span><small>${user?escape(user.email):'Önizleme modu'}</small></div></div>
+        <button type="button" id="profile-menu" class="profile" aria-haspopup="dialog" aria-label="Hesap ve ayarlar"><div class="avatar">${user?escape(user.email.slice(0,2).toUpperCase()):'M'}</div><div><span>${user?'Kişisel hesap':'Misafir alanı'}</span><small>${user?escape(user.email):'Önizleme modu'}</small></div></button>
       </div>
     </aside>
     <main class="main">

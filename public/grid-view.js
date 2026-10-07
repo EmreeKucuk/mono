@@ -40,7 +40,7 @@ export function patchGrid(desk, widgets, columns, rows, { card, style, bind }) {
     node.style.cssText = style(widget.grid, columns);
     node.dataset.gridCols=String(widget.grid.cols);
     node.dataset.gridRows=String(widget.grid.rows);
-    node.querySelector('.resize-handle').setAttribute('aria-label', `${widget.title} boyutu ${widget.grid.cols} sütun, ${widget.grid.rows} satır; ok tuşlarıyla değiştir`);
+    node.querySelector('.resize-handle')?.setAttribute('aria-label', `${widget.title} boyutu ${widget.grid.cols} sütun, ${widget.grid.rows} satır; ok tuşlarıyla değiştir`);
   }
   // Avoid detaching live iframe players on every grid reconciliation.
   for(let index=0;index<widgets.length;index++) {

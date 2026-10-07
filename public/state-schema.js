@@ -1,7 +1,10 @@
+import {preferences} from './preferences.js';
+import {clipboardItems} from './clipboard-model.js';
+import {sanitizeDrawing} from './drawing.js';
 // A persisted workspace is untrusted input, even when it belongs to this account.
-export const STATE_VERSION=3;
+export const STATE_VERSION=4;
 import { spotifyContent } from './spotify-url.js';
-const types=new Set(['tasks','note','calendar','focus','habits','links','journal','goal','dates','spotify','clipboard']);
+const types=new Set(['tasks','note','calendar','focus','habits','links','journal','goal','dates','spotify','clipboard','drawing']);
 const blockTypes=new Set(['text','title','subtitle','bullet','check','number','quote']);
 const str=(value,max=10000)=>String(typeof value==='string'?value:'').slice(0,max);
 const list=(value,max=500)=>Array.isArray(value)?value.slice(0,max):[];
@@ -41,9 +44,10 @@ function widget(value){
     id:id(value.id),type:value.type,title:value.type==='note'&&value.title==='Aklımdakiler'?'Notlar':str(value.title,60)||value.type,x:number(value.x),y:number(value.y),width:number(value.width,320,100,3000)
   };
   if(value.grid&&typeof value.grid==='object')w.grid={
-    slot:integer(value.grid.slot,0,0,10000),cols:integer(value.grid.cols,1,1,3),rows:integer(value.grid.rows,1,1,100)
+    slot:integer(value.grid.slot,0,0,10000),cols:integer(value.grid.cols,1,1,6),rows:integer(value.grid.rows,1,1,100)
   };
   w.text=str(value.text,200000);
+  if(w.type==='drawing')w.drawing=sanitizeDrawing(value.drawing);
   if(w.type==='spotify')w.spotifyUrl=spotifyContent(value.spotifyUrl)?.url||'';
   w.tasks=list(value.tasks,1000).map(task);
   w.groups=list(value.groups,100).map(g=>({
@@ -89,7 +93,7 @@ function sanitizeLayout(input){
     ids.add(w.id);
   }
   return {
-    gridColumns:input.gridColumns===2?2:3,autoArrange:input.autoArrange!==false,widgets,events:list(input.events,2000).map(e=>({
+    gridColumns:integer(input.gridColumns,3,2,6),autoArrange:input.autoArrange!==false,widgets,events:list(input.events,2000).map(e=>({
       id:id(e?.id),date:date(e?.date),text:str(e?.text,180),...(typeof e?.time==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time)?{time:e.time}:{})
     })).filter(e=>e.date)
   };
@@ -97,7 +101,11 @@ function sanitizeLayout(input){
 export function sanitizeWorkspace(input){
   const layout=sanitizeLayout(input),version=input.schemaVersion??0;
   if(!Number.isInteger(version)||version>STATE_VERSION||version<0)throw new Error('Desteklenmeyen çalışma alanı sürümü.');
-  const global={reminders:list(input.reminders,2000).map(item=>({id:id(item?.id),text:str(item?.text,300),at:number(item?.at,0,0,1e15),done:item?.done===true,deskId:str(item?.deskId,80)})).filter(item=>item.at>0),zoneProfiles:list(input.zoneProfiles,100).map(profile=>({id:id(profile?.id),name:str(profile?.name,60)||'Zone',minutes:integer(profile?.minutes,25,0,1440),allowed:list(profile?.allowed,3).filter(value=>['reminder','focus','zone'].includes(value))})),activeZone:input.activeZone&&typeof input.activeZone==='object'?{profileId:str(input.activeZone.profileId,80),endAt:number(input.activeZone.endAt,0,0,1e15),startedAt:number(input.activeZone.startedAt,0,0,1e15),allowed:list(input.activeZone.allowed,3).filter(value=>['reminder','focus','zone'].includes(value))}:null};
+  const settings=preferences(input.settings);
+  const global={settings,clipboardItems:settings.clipboardCloud?clipboardItems(input.clipboardItems,settings.clipboardDays):[],
+    clipboardRemoved:settings.clipboardCloud?list(input.clipboardRemoved,100).map(r=>({text:str(r?.text,20000),at:number(r?.at,0,0,1e15)})).filter(r=>r.text&&r.at<=Date.now()+300000&&(!settings.clipboardDays||r.at>=Date.now()-settings.clipboardDays*86400000)):[],
+    deletedPages:list(input.deletedPages,200).map(entry=>{const owner=id(entry?.widgetId),page=entry?.page,secret=encrypted(page?.encrypted);if(!page||typeof page.id!=='string'||id(page.id)!==page.id||owner!==entry.widgetId)throw Error('Silinen sayfa kimliği geçersiz.');return {id:id(entry.id),widgetId:owner,widgetTitle:str(entry.widgetTitle,60),deskId:str(entry.deskId,80),deletedAt:number(entry.deletedAt,0,0,1e15),page:{id:page.id,name:str(page.name,80)||'Sayfa',blocks:secret?[]:sanitizeNoteBlocks(page.blocks),...(secret?{encrypted:secret}:{})}};}),
+    deletedDesks:list(input.deletedDesks,50).map(entry=>({id:id(entry?.id),deletedAt:number(entry?.deletedAt,0,0,1e15),desk:{id:id(entry?.desk?.id),name:str(entry?.desk?.name,80)||'Masa',workspace:sanitizeLayout(entry?.desk?.workspace)}})),reminders:list(input.reminders,2000).map(item=>({id:id(item?.id),text:str(item?.text,300),at:number(item?.at,0,0,1e15),done:item?.done===true,deskId:str(item?.deskId,80)})).filter(item=>item.at>0),zoneProfiles:list(input.zoneProfiles,100).map(profile=>({id:id(profile?.id),name:str(profile?.name,60)||'Zone',minutes:integer(profile?.minutes,25,0,1440),allowed:list(profile?.allowed,3).filter(value=>['reminder','focus','zone'].includes(value))})),activeZone:input.activeZone&&typeof input.activeZone==='object'?{profileId:str(input.activeZone.profileId,80),endAt:number(input.activeZone.endAt,0,0,1e15),startedAt:number(input.activeZone.startedAt,0,0,1e15),allowed:list(input.activeZone.allowed,3).filter(value=>['reminder','focus','zone'].includes(value))}:null};
   if(input.desks===undefined)return {schemaVersion:STATE_VERSION,...layout,...global,activeDeskId:'default',desks:[{id:'default',name:'Kişisel alan'}]};
   if(!Array.isArray(input.desks)||!input.desks.length)throw new Error('Masa listesi geçersiz.');
   const used=new Set();

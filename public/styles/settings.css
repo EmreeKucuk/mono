@@ -1,0 +1,23 @@
+.settings-dialog,.manage-dialog{width:min(720px,calc(100vw - 24px));max-height:90dvh;overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:20px;padding:24px}
+.settings-dialog>header,.manage-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.settings-dialog h2,.manage-dialog h2{margin:0;font-size:20px}
+.settings-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px}
+.settings-tabs button{border-radius:12px;padding:9px 12px}
+.settings-tabs [aria-selected=true]{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.settings-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.settings-form label{display:flex;flex-direction:column;gap:8px;min-width:0;color:var(--text)}
+.settings-form input:not([type=checkbox]),.settings-form select{width:100%;min-width:0;border-radius:12px;background:var(--bg);color:var(--text);border:1px solid var(--line);padding:10px}
+.settings-form .check-label{flex-direction:row;align-items:center;gap:10px}
+.settings-form p,.settings-form>button,.settings-form .check-label{grid-column:1/-1}
+.manage-list{display:grid;gap:9px}.manage-list>div{display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:12px;min-width:0}.manage-list>div>button:first-child,.manage-list>div>span{flex:1;text-align:left;overflow-wrap:anywhere;min-width:0}.manage-list small{display:block;margin-top:4px;color:var(--muted)}
+.account-options{display:grid;gap:10px}.account-options button{text-align:left;padding:14px;border-radius:12px}
+.connection-card{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:1px solid var(--line);border-radius:16px;padding:18px}.connection-card>div{flex:1;min-width:180px}.connection-card p{font-size:13px;color:var(--muted)}
+button.profile{width:100%;text-align:left;background:transparent;color:var(--text);border:1px solid transparent;border-radius:14px;padding:10px;cursor:pointer}button.profile:hover{border-color:var(--line)}button.profile:focus-visible{outline:2px solid var(--accent)}
+.desk-actions{flex-wrap:wrap}.notebook-pages{flex-wrap:wrap}.notebook-pages select{flex:1;min-width:100px}
+.drawing-widget{display:flex;flex-direction:column;height:100%;min-height:240px;gap:10px}.drawing-tools{display:flex;flex-wrap:wrap;align-items:center;gap:7px}.drawing-tools select{max-width:120px;min-width:0;border-radius:10px}.drawing-tools input{max-width:100px}.drawing-widget canvas{width:100%;min-height:160px;flex:1;background:#171e27;border:1px solid var(--line);border-radius:12px;touch-action:none;object-fit:fill}.drawing-widget canvas:focus-visible{outline:2px solid var(--accent)}.draw-text input{width:100%;min-width:0}
+.overlay-shell{height:100dvh;display:flex;flex-direction:column;padding:8px;background:var(--bg)}.overlay-bar{display:flex;align-items:center;gap:8px;padding:4px 2px 12px;flex:none;font-size:12px}.overlay-bar span{flex:1;color:var(--muted)}.overlay-bar [aria-pressed=true]{color:var(--accent)}.overlay-shell #desk{flex:1;min-height:0;overflow:hidden;padding:0}.overlay-shell .grid-surface{display:flex!important;min-width:0!important;height:100%;gap:0}.overlay-shell .grid-cell{display:none}.overlay-shell .widget{flex:1;height:100%!important;grid-column:1!important;grid-row:1!important}.overlay-shell .widget-body{overflow:auto}.overlay-shell .widget-head{cursor:default}.overlay-shell .grip,.overlay-shell .resize-handle{display:none!important}.overlay-shell .widget-head:focus-visible{outline:2px solid var(--accent)}
+@media(max-width:760px){.grid-surface{min-width:0!important;grid-template-columns:minmax(0,1fr)!important}.grid-surface>.widget{grid-column:1!important;grid-row:auto!important}.grid-cell{display:none}.grid-surface{grid-auto-rows:var(--cell-size)}.settings-form{grid-template-columns:1fr}.settings-dialog,.manage-dialog{padding:16px}.settings-tabs button{flex:1;font-size:12px}.notebook-pages button{padding:4px 7px}}
+
+.content{max-width:none;margin:0;width:100%}
+
+.settings-form label{margin:0;font-size:13px}.settings-form input{margin-top:0}.settings-dialog hr{border:0;border-top:1px solid var(--line);margin:22px 0}

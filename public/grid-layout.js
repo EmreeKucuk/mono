@@ -1,11 +1,12 @@
+import {adaptiveColumns} from './preferences.js';
 // Row-major placement. Persisted layout is independent of viewport pixels.
 const integer=(n,fallback=0)=>Number.isInteger(n)&&n>=0?n:fallback;
 export function validSpan(c,r){
-  return c>=1&&r>=1&&(c*r===1||(c*r)%2===0);
+  return Number.isInteger(c)&&Number.isInteger(r)&&c>=1&&c<=6&&r>=1&&r<=100;
 }
 export function snapSpan(c,r,columns){
   c=Math.max(1,Math.min(columns,Math.round(c)));
-  r=Math.max(1,Math.round(r));
+  r=Math.max(1,Math.min(100,Math.round(r)));
   if(validSpan(c,r))return {
     cols:c,rows:r
   };
@@ -88,7 +89,7 @@ export function compactAroundLarge(widgets,columns,pinned=null){
   return result;
 }
 export function normalizeGrid(state){
-  state.gridColumns=state.gridColumns===2?2:3;
+  state.gridColumns=Math.max(2,Math.min(6,integer(state.gridColumns,3)));
   if(typeof state.autoArrange!=='boolean')state.autoArrange=true;
   if(state.widgets.some(w=>!w.grid)){
     const old=state.widgets.filter(w=>w.grid),fresh=state.widgets.filter(w=>!w.grid).sort((a,b)=>(a.y||0)-(b.y||0)||(a.x||0)-(b.x||0));
@@ -212,13 +213,17 @@ export function disposeGrid(){
   };
 }
 export function bindGrid(state,desk,{
-  changed,render,announce
+  changed,render,announce,adapt=()=>{}
 }){
   cleanup();
   const surface=desk.querySelector('.grid-surface');
   if(!surface)return;
   const columns=state.gridColumns;
-  const size=()=>surface.style.setProperty('--cell-size',`${Math.min(420,Math.max(290,(surface.clientWidth-(columns-1)*16)/columns*.75))}px`);
+  const size=()=>{
+    const prefs=state.settings||{},scale=prefs.widgetScale||1;
+    surface.style.setProperty('--cell-size',Math.round(Math.min(480,Math.max(260,(surface.clientWidth-(columns-1)*16)/columns*.75))*scale)+'px');
+    if(prefs.gridMode==='auto'&&!surface.classList.contains('grid-editing')){const desired=adaptiveColumns(desk.clientWidth-6,prefs.minWidgetWidth||280);if(desired!==columns)adapt(desired);}
+  };
   size();
   const observer=new ResizeObserver(size);
   observer.observe(surface);
@@ -329,7 +334,7 @@ export function bindGrid(state,desk,{
       document.addEventListener('keydown',escape);
     };
     head.onpointerdown=e=>start(e,false);
-    handle.onpointerdown=e=>start(e,true);
+    handle.onpointerdown=e=>{if(state.settings?.resizeWidgets!==false)start(e,true);};
     head.onkeydown=e=>{
       if(e.target!==head||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;
       e.preventDefault();
@@ -347,7 +352,7 @@ export function bindGrid(state,desk,{
       do{
         if(horizontal)c+=step;
         else r+=step;
-        if(c<1||c>columns||r<1)return;
+        if(c<1||c>columns||r<1||r>100)return;
       }
       while(!validSpan(c,r));
       const target={

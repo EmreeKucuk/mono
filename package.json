@@ -1,6 +1,6 @@
 {
   "name": "mono-workspace",
-  "version": "1.2.4",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -33,7 +33,13 @@
     },
     "files": [
       "desktop/**",
-      "package.json"
+      "package.json",
+      "public/state-schema.js",
+      "public/preferences.js",
+      "public/clipboard-model.js",
+      "public/drawing.js",
+      "public/ui-utils.js",
+      "public/spotify-url.js"
     ],
     "win": {
       "target": [

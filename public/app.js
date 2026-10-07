@@ -1,3 +1,9 @@
+import {preferences} from './preferences.js';
+import {installSettings,openAccountMenu,openDeskList} from './settings.js';
+import {trashPage} from './recycle-bin.js';
+import {configureClipboard} from './clipboard-widget.js';
+import {renderDrawing,bindDrawing} from './drawing.js';
+import {isOverlay,publishWorkspace,startOverlay,overlayChanged,bindOverlayButton,hasOverlayPending} from './overlay.js';
 import {bindDesktopUpdates,installDesktopUpdates} from './desktop-updates.js';
 import {bindDashboard,installDashboard,syncDashboard,dashboardNotification} from './dashboard-features.js';
 import {bindWeather} from './weather.js';
@@ -9,23 +15,28 @@ import { renderCalendar } from './calendar-view.js';
 import { renderShell } from './shell-view.js';
 import {stopSpotifyBrowser} from './spotify-account.js';
 import { askName } from './name-dialog.js';
-import { compactAroundLarge,applyLayout,collapseFour } from './grid-layout.js';
+import { compactAroundLarge,applyLayout,collapseFour,arrange,snapSpan } from './grid-layout.js';
 import { normalizeGrid,gridStyle,rowCount,bindGrid,disposeGrid,appendGridWidget,changeColumns,pointSlot } from './grid-layout.js';
 import { installWidgetSearch } from './widget-search.js';
 import { renderNotebook,bindNotebook,forgetNotebook } from './notebook.js';
 import { extraTypes,renderExtra,bindExtra } from './extra-widgets.js';
 import { renderTaskGroups,bindTaskGroups } from './task-groups.js';
-import { configured,offline,current,signIn,signUp,signOut,loadWorkspace,saveWorkspace,stageWorkspace,hasPendingDraft,reloadRemoteWorkspace } from './cloud.js';
+import { configured,offline,current,signIn,signUp,signOut,loadWorkspace,saveWorkspace,stageWorkspace,hasPendingDraft,reloadRemoteWorkspace,refreshWorkspace } from './cloud.js';
 import { sanitizeWorkspace } from './state-schema.js';
 import { $,uid,escape,icon,dateKey } from './ui-utils.js';
 import { captureFocus,restoreFocus } from './focus-state.js';
 const today=dateKey(new Date()), types={
-  tasks:['Yapılacaklar','Bir sonraki adımın'],note:['Notlar','Sayfalar, başlıklar ve hızlı komutlar'],calendar:['Takvim','Günlerini planla'],focus:['Odak sayacı','Tek bir şeye odaklan'],...extraTypes
+  drawing:['Çizim','Kalem, silgi, highlighter ve metin'],tasks:['Yapılacaklar','Bir sonraki adımın'],note:['Notlar','Sayfalar, başlıklar ve hızlı komutlar'],calendar:['Takvim','Günlerini planla'],focus:['Odak sayacı','Tek bir şeye odaklan'],...extraTypes
 };
 let updatePrepared=false;
 let user=null,view='board',toolbox=false,register=false,saveTimer,saveQueue=Promise.resolve(),saving=false,dirty=false,conflicted=false,revision=0,selectedDate=today,month=new Date(new Date().getFullYear(),new Date().getMonth(),1),installEvent=null;
 import { initial } from './workspace-model.js';
 let state=initial();
+try{state.settings=preferences(JSON.parse(localStorage.getItem('mono-device-settings')||'{}'));state.settings.clipboardCloud=false;}catch{state.settings=preferences();}
+let adaptTimer,cloudPollBusy=false;
+const configureClip=()=>{try{localStorage.setItem('mono-device-settings',JSON.stringify({...state.settings,clipboardCloud:false}));}catch{}configureClipboard({state:()=>state,changed});};
+function adaptGrid(columns){clearTimeout(adaptTimer);adaptTimer=setTimeout(()=>{if(state.settings.gridMode!=='auto'||state.gridColumns===columns)return;changeColumns(state,columns);changed();renderDesk();const select=$('#grid-select');if(select)select.value=String(columns);},150);}
+
 let sidebarHidden=window.matchMedia('(max-width:760px)').matches;
 try {
   const preference=localStorage.getItem('mono-sidebar-hidden');
@@ -66,7 +77,11 @@ function status(message){
   if(announcement)announcement.textContent=message;
 }
 function changed(){
+  updatePrepared=false;
+  if(isOverlay()){overlayChanged();return;}
   syncDashboard();
+  publishWorkspace(state);
+  configureClip();
   dirty=true;
   revision++;
   if(!user){
@@ -134,6 +149,12 @@ function exportWorkspace(){
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function shell(){
+  state.settings=preferences(state.settings);
+  if(isOverlay()){
+    $('#app').innerHTML='<div class="overlay-shell"><header class="overlay-bar"><span>MONO · Mini görünüm</span><button data-overlay-top aria-pressed="true" aria-label="Her zaman üstte">Üstte tut</button><button data-overlay-close aria-label="Mini pencereyi kapat">×</button></header><div id="desk" class="desk"></div></div>';
+    const top=$('[data-overlay-top]');top.onclick=async()=>{const value=top.getAttribute('aria-pressed')!=='true';await window.monoDesktop.workspace.top(value);top.setAttribute('aria-pressed',String(value));};$('[data-overlay-close]').onclick=()=>window.monoDesktop.workspace.close();
+    renderDesk();configureClip();return;
+  }
   ensureDesks(state);
   normalizeGrid(state);
   $('#app').innerHTML=renderShell({
@@ -144,10 +165,13 @@ function shell(){
   bindDashboard();
   bindWeather(askName);
   bindDesktopUpdates();
+  configureClip();
+  publishWorkspace(state);
   updateClock();
   if(installEvent)$('#install').hidden=false;
 }
 function widgetBody(w){
+  if(w.type==='drawing')return renderDrawing();
   if(w.type==='tasks')return renderTaskGroups(w);
   if(w.type==='note')return renderNotebook(w);
   if(extraTypes[w.type])return renderExtra(w);
@@ -157,7 +181,7 @@ function widgetBody(w){
   return `<div class="focus"><form class="focus-duration"><label>Odak süresi <input type="number" name="minutes" aria-label="Odak süresi dakika" min="1" max="1440" value="${w.duration||25}"> dakika</label><button aria-label="Odak süresini uygula">Uygula</button></form><div class="focus-label">Zamanını tek bir işe ayır.</div><div class="timer" data-timer>${timeString(remaining(w))}</div><div class="focus-controls"><button class="primary" data-start>${w.running?'Duraklat':remaining(w)===0?'Yeniden başlat':'Odaklan'}</button><button data-reset aria-label="Sayacı sıfırla">↺</button></div><div class="focus-foot"><i></i><i></i><i></i><i></i></div></div>`;
 }
 function widgetCard(w,cols){
-  return `<article class="widget" data-id="${w.id}" style="${view==='board'?gridStyle(w.grid,cols):''}"><header class="widget-head" tabindex="0" role="group" aria-label="${escape(w.title)} widget'ını ok tuşlarıyla taşı">${icon(w.type)}<span class="widget-title">${escape(w.title)}</span>${view==='board'?`<span class="grip">⠿</span>`:''}<button class="icon" data-rename aria-label="Widget adını değiştir" style="font-size:15px">✎</button><button class="icon" data-remove aria-label="Widget kaldır" style="font-size:17px">×</button></header><div class="widget-body">${widgetBody(w)}</div>${view==='board'?`<button class="resize-handle" aria-label="${escape(w.title)} boyutu ${w.grid.cols} sütun, ${w.grid.rows} satır; ok tuşlarıyla değiştir" title="Sürükle veya ok tuşlarıyla boyutlandır">◢</button>`:''}</article>`;
+  return `<article class="widget" data-id="${w.id}" style="${view==='board'&&!isOverlay()?gridStyle(w.grid,cols):''}"><header class="widget-head" tabindex="0" role="group" aria-label="${escape(w.title)} widget'ını ok tuşlarıyla taşı">${icon(w.type)}<span class="widget-title">${escape(w.title)}</span>${view==='board'?`<span class="grip">⠿</span>`:''}<button class="icon" data-overlay aria-label="Mini pencereyi aç" title="Mini görünüm · Her zaman üstte">▣</button><button class="icon" data-rename aria-label="Widget adını değiştir" style="font-size:15px">✎</button><button class="icon" data-remove aria-label="Widget kaldır" style="font-size:17px">×</button></header><div class="widget-body">${widgetBody(w)}</div>${view==='board'&&!isOverlay()?`<button ${state.settings?.resizeWidgets===false?'hidden':''} class="resize-handle" aria-label="${escape(w.title)} boyutu ${w.grid.cols} sütun, ${w.grid.rows} satır; ok tuşlarıyla değiştir" title="Sürükle veya ok tuşlarıyla boyutlandır">◢</button>`:''}</article>`;
 }
 function renderWidget(id){
   const w=state.widgets.find(item=>item.id===id),old=document.querySelector(`.widget[data-id="${id}"]`);
@@ -168,8 +192,8 @@ function renderWidget(id){
   const next=template.content.firstElementChild;
   old.replaceWith(next);
   bindWidgets(next);
-  if(view==='board')bindGrid(state,$('#desk'),{
-    changed,render:renderDesk,announce:notify
+  if(view==='board'&&!isOverlay())bindGrid(state,$('#desk'),{
+    changed,render:renderDesk,announce:notify,adapt:adaptGrid
   });
   restoreFocus(next,focused);
   refreshWidgetShortcuts();
@@ -186,9 +210,9 @@ function renderDesk(){
     $('#desk').innerHTML=widgets.map(w=>widgetCard(w,cols)).join('')||'<div class="empty-state">ToolBox’tan bir widget ekleyebilirsin.</div>';
     bindWidgets();
   }
-  if(view==='board'){
+  if(view==='board'&&!isOverlay()){
     bindGrid(state,$('#desk'),{
-      changed,render:renderDesk,announce:notify
+      changed,render:renderDesk,announce:notify,adapt:adaptGrid
     });
     $('#grid-count').textContent=cols+' sütun · '+rows+' satır';
   }
@@ -227,6 +251,9 @@ function bindShell(){
     if(!name)return;
     await flushEncryption();state.widgets.filter(w=>w.type==='note').forEach(w=>forgetNotebook(w.id));addDesk(state,name);resetDesk();
   };
+  $('#desk-list').onclick=openDeskList;
+  $('#desk-select').setAttribute('aria-haspopup','dialog');$('#desk-select').onpointerdown=e=>{if(e.button===0){e.preventDefault();openDeskList();}};
+  $('#profile-menu').onclick=openAccountMenu;
   $('#desk-rename').onclick=async()=>{
     const desk=state.desks.find(desk=>desk.id===state.activeDeskId);
     const name=await askName({title:'Masa adını değiştir',value:desk.name,maxLength:80});
@@ -251,6 +278,7 @@ function bindShell(){
     shell();
   });
   $('#grid-select')?.addEventListener('change',e=>{
+    state.settings.gridMode='manual';
     changeColumns(state,Number(e.target.value));
     changed();
     shell();
@@ -331,6 +359,8 @@ function bindShell(){
 function bindWidgets(scope=document){
   (scope.matches?.('.widget')?[scope]:scope.querySelectorAll('.widget')).forEach(el=>{
     const w=state.widgets.find(w=>w.id===el.dataset.id);
+    const overlayButton=el.querySelector('[data-overlay]');overlayButton.hidden=isOverlay();bindOverlayButton(overlayButton,state,w,notify);
+    if(isOverlay()){el.querySelector('[data-remove]').hidden=true;el.querySelector('[data-rename]').hidden=true;}
     el.querySelector('[data-remove]').onclick=async()=>{
       const d=$('#confirm');
       d.showModal();
@@ -377,8 +407,9 @@ function bindWidgets(scope=document){
       }
     };
     if(w.type==='note')bindNotebook(w,el.querySelector('.widget-body'),{
-      changed,notify,askName
+      changed,notify,askName,deleted:async(widget,page)=>{await flushEncryption();trashPage(state,widget,page);}
     });
+    if(w.type==='drawing')bindDrawing(w,el,{changed});
     if(extraTypes[w.type])bindExtra(w,el,{
       changed,render:()=>renderWidget(w.id),notify,beforeConnect:async()=>{
         if(dirty)await persist();
@@ -517,10 +548,10 @@ $('#auth-form').onsubmit=async e=>{
   }
 };
 setInterval(()=>{
-  for(const w of state.widgets.filter(w=>w.type==='focus'&&w.running)){
+  for(const w of [state,...(isOverlay()?[]:state.desks?.map(d=>d.workspace).filter(Boolean)||[])].flatMap(s=>s.widgets).filter(w=>w.type==='focus'&&w.running)){
     const r=remaining(w),el=document.querySelector(`[data-id="${w.id}"] [data-timer]`);
     if(el)el.textContent=timeString(r);
-    if(r===0){
+    if(r===0&&!isOverlay()){
       w.running=false;
       w.remaining=0;
       changed();
@@ -532,7 +563,7 @@ setInterval(()=>{
 },500);
 window.addEventListener('beforeunload',e=>{
   if(updatePrepared)return;
-  if(hasPendingEncryption()||user&&(dirty||saving)){
+  if(hasPendingEncryption()||user&&(dirty||saving)||isOverlay()&&hasOverlayPending()){
     e.preventDefault();
     e.returnValue='';
   }
@@ -548,6 +579,20 @@ window.addEventListener('beforeinstallprompt',e=>{
 });
 const openWidgetSearch=installWidgetSearch(types,addWidget,icon);
 installWidgetShortcuts(id=>state.widgets.find(widget=>widget.id===id)?.type);
+installSettings({state:()=>state,user:()=>user,flush:flushEncryption,changed,render:shell,notify,columns:columns=>changeColumns(state,columns),clipboard:configureClip,
+  resize:(id,cols,rows)=>{const w=state.widgets.find(w=>w.id===id);if(!w)throw Error('Widget bulunamadı.');const target={id,slot:w.grid.slot,...snapSpan(cols,rows,state.gridColumns)};applyLayout(state,state.autoArrange?compactAroundLarge(state.widgets,state.gridColumns,target):arrange(state.widgets,state.gridColumns,target));},
+  theme:value=>{applyTheme(value);localStorage.setItem('mono-theme',value);},logout:()=>$('#account').click(),
+  switchDesk:async id=>{await flushEncryption();state.widgets.filter(w=>w.type==='note').forEach(w=>forgetNotebook(w.id));if(switchDesk(state,id)){changed();shell();}},
+  beforeConnect:async()=>{if(dirty)await persist();if(dirty)throw Error('Hesaba bağlanmadan önce çalışma alanını kaydet.');}
+});
+window.monoDesktop?.workspace?.onEdit(value=>{
+  const layout=value.deskId===state.activeDeskId?state:state.desks.find(d=>d.id===value.deskId)?.workspace;
+  const widget=layout?.widgets.find(w=>w.id===value.widget.id);if(!widget)return;
+  if(widget.type==='note')forgetNotebook(widget.id);
+  Object.assign(widget,value.widget);if(widget.type==='calendar')layout.events=value.events;
+  state.deletedPages??=[];for(const page of value.deletedPages)if(!state.deletedPages.some(p=>p.id===page.id))state.deletedPages.push(page);
+  changed();if(value.deskId===state.activeDeskId)renderWidget(widget.id);
+});
 installDesktopUpdates({notify,cancel:()=>{updatePrepared=false;},prepare:async()=>{
   clearTimeout(saveTimer);
   await flushEncryption();
@@ -558,9 +603,10 @@ installDesktopUpdates({notify,cancel:()=>{updatePrepared=false;},prepare:async()
   if(conflicted||dirty||hasPendingDraft()||hasPendingEncryption())throw Error('Değişiklikler henüz kaydedilmedi. Bağlantıyı ve kaydı kontrol edip tekrar dene.');
   updatePrepared=true;
 }});
-installDashboard({state:()=>state,changed,notify,askName,calendar:()=>state.widgets.filter(w=>w.type==='calendar').forEach(w=>renderWidget(w.id))});
+if(!isOverlay())installDashboard({state:()=>state,changed,notify,askName,calendar:()=>state.widgets.filter(w=>w.type==='calendar').forEach(w=>renderWidget(w.id))});
 shell();
-try{
+if(isOverlay()){await startOverlay({state:()=>state,replace:value=>{state=sanitizeWorkspace(value);shell();},flush:flushEncryption,notify,export:exportWorkspace});}
+else try{
   const session=await current();
   if(session){
     user=session.user;
@@ -610,3 +656,8 @@ try{
 }
 catch{
 }
+
+setInterval(async()=>{
+  if(isOverlay()||!user||!state.settings?.clipboardCloud||dirty||saving||conflicted||cloudPollBusy||document.querySelector('dialog[open]')||document.activeElement?.closest('input,textarea,[contenteditable]'))return;
+  cloudPollBusy=true;try{const currentRevision=revision,loaded=await refreshWorkspace(()=>!dirty&&!saving&&revision===currentRevision);if(loaded&&!dirty&&!saving){state=loaded;shell();}}catch(error){if(error.code==='CONFLICT'){conflicted=true;status('Kayıt çakışması · İncele');showConflict();}}finally{cloudPollBusy=false;}
+},30000);

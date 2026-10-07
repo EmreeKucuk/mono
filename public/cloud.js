@@ -193,3 +193,12 @@ export async function reloadRemoteWorkspace() {
   pending = false;
   return state;
 }
+
+// Background reads must not advance the CAS revision while a user starts editing.
+export async function refreshWorkspace(isStillClean){
+  if(!user)return null;const remote=await request('workspace');await stageQueue;
+  if(!isStillClean()||await readDraft(draftKey()))return null;
+  const next=remote.state?sanitizeWorkspace(remote.state):null;
+  await writeSnapshot(user.id,{...remote,state:next});
+  if(!isStillClean())return null;revision=remote.revision;return next;
+}

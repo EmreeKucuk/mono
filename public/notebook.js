@@ -1,3 +1,4 @@
+import {confirmAction} from './confirm-dialog.js';
 import { clipboardType,readClipboardBlocks,deletionBoundary } from './editor-input.js';
 import {isPageOpen,openedPage,protectPage,unlockPage,saveOpenedPage,lockPage,removePassword,askPassword} from './note-vault.js';
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({
@@ -14,8 +15,8 @@ const names={
   text:'Metin',title:'Başlık',subtitle:'Alt başlık',bullet:'Madde',check:'Kontrol maddesi',number:'Numaralı madde',quote:'Alıntı'
 };
 const histories=new Map();
-export function forgetNotebook(widgetId){
-  for(const key of histories.keys())if(key.startsWith(widgetId+':'))histories.delete(key);
+export function forgetNotebook(widgetId,pageId=null){
+  for(const key of histories.keys())if(pageId?key===widgetId+':'+pageId:key.startsWith(widgetId+':'))histories.delete(key);
 }
 function pageOf(w){
   if(!w.pages?.length)w.pages=[{
@@ -35,16 +36,16 @@ function slashAt(text,offset,space=false){
 export function renderNotebook(w){
   const page=pageOf(w),raw=w.pages.find(page=>page.id===w.pageId),locked=!isPageOpen(raw);
   let number=0;
-  const blocks=page.blocks.map(block=>{
+  const blocks=page.blocks.map((block,index)=>{
     number=block.type==='number'?number+1:0;
-    return `<div class="note-block block-${block.type}" data-block="${block.id}" style="--indent:${block.indent||0}">${block.type==='check'?`<input type="checkbox" data-block-check="${block.id}" aria-label="${esc(block.text||'Kontrol maddesi')} tamamlandı" ${block.done?'checked':''}>`:`<span class="block-marker" aria-hidden="true">${block.type==='bullet'?'•':block.type==='number'?number+'.':block.type==='quote'?'│':''}</span>`}<span class="block-input ${block.done?'checked':''}" data-block-input="${block.id}" data-placeholder="${block.type==='text'?'Yazmaya başla veya / komutunu kullan…':names[block.type]}">${esc(block.text)}</span></div>`;
+    return `<div class="note-block block-${block.type}" data-block="${block.id}" style="--indent:${block.indent||0}">${block.type==='check'?`<input type="checkbox" data-block-check="${block.id}" aria-label="${esc(block.text||'Kontrol maddesi')} tamamlandı" ${block.done?'checked':''}>`:`<span class="block-marker" aria-hidden="true">${block.type==='bullet'?'•':block.type==='number'?number+'.':block.type==='quote'?'│':''}</span>`}<span class="block-input ${block.done?'checked':''}" data-block-input="${block.id}" data-placeholder="${index===0&&page.blocks.every(item=>!item.text.trim())?'Yazmaya başla veya / komutunu kullan…':''}">${esc(block.text)}</span></div>`;
   }).join('');
   const security=raw.encrypted?`<button type="button" ${locked?'data-page-unlock':'data-page-lock'}>${locked?'Kilidi aç':'Kilitle'}</button>${locked?'':'<button type="button" data-page-repin>PIN değiştir</button><button type="button" data-page-unprotect>PIN / şifre kaldır</button>'}`:'<button type="button" data-page-protect>PIN koy</button>';
-  if(locked)return `<div class="notebook" data-notebook-widget="${w.id}"><div class="notebook-pages"><select data-page aria-label="Not sayfası">${w.pages.map(item=>`<option value="${item.id}" ${item.id===w.pageId?'selected':''}>${esc(item.name)}</option>`).join('')}</select><button data-page-add aria-label="Yeni sayfa">+</button><button data-page-rename aria-label="Sayfayı yeniden adlandır">✎</button><button data-expand aria-label="Notu genişlet">↗</button></div><div class="note-security">${security}</div><div class="note-locked"><strong>Bu sayfa kilitli</strong><p>İçeriği görmek için sayfanın şifresini gir.</p></div></div>`;
-  return `<div class="notebook" data-notebook-widget="${w.id}"><div class="notebook-pages"><select data-page aria-label="Not defteri sayfası">${w.pages.map(item=>`<option value="${item.id}" ${item.id===w.pageId?'selected':''}>${esc(item.name)}</option>`).join('')}</select><button data-page-add class="icon" aria-label="Yeni sayfa" title="Yeni sayfa · Ctrl+Shift+N">＋</button><button data-page-rename class="icon" aria-label="Sayfayı yeniden adlandır">✎</button><button data-expand class="icon" aria-label="Not defterini genişlet">⛶</button></div><div class="note-security">${security}</div><div class="note-document" contenteditable="true" role="textbox" aria-multiline="true" aria-label="${esc(page.name)} içeriği" spellcheck="true">${blocks}</div><div class="note-bottom"><span data-page-count>${page.blocks.reduce((n,b)=>n+b.text.length,0)} karakter</span><span>${w.pages.length} sayfa</span></div><details class="command-guide"><summary>/ Komutlar ve kısayollar</summary><div class="command-list">${[['/title','Başlık'],['/subtitle','Alt başlık'],['/bullet','Madde listesi'],['/check','Kontrol listesi'],['/number','Numaralı liste'],['/quote','Alıntı'],['/text','Normal metin']].map(([cmd,label])=>`<button type="button" data-command="${cmd.slice(1)}"><code>${cmd}</code><span>${label}</span></button>`).join('')}</div><p>Komut + boşluk ile yazmaya başla. Shift+Enter: aynı blokta yeni satır. Enter: yeni blok; boş maddede listeden çık. Esc: normal metne geç. Tab / Shift+Tab: maddeyi içeri / dışarı al. Ctrl+Z: geri al.</p></details></div>`;
+  if(locked)return `<div class="notebook" data-notebook-widget="${w.id}"><div class="notebook-pages"><select data-page aria-label="Not sayfası">${w.pages.map(item=>`<option value="${item.id}" ${item.id===w.pageId?'selected':''}>${esc(item.name)}</option>`).join('')}</select><button data-page-list class="icon" aria-label="Sayfa listesi ve silme">☷</button><button data-page-add aria-label="Yeni sayfa">+</button><button data-page-rename aria-label="Sayfayı yeniden adlandır">✎</button><button data-expand aria-label="Notu genişlet">↗</button></div><div class="note-security">${security}</div><div class="note-locked"><strong>Bu sayfa kilitli</strong><p>İçeriği görmek için sayfanın şifresini gir.</p></div></div>`;
+  return `<div class="notebook" data-notebook-widget="${w.id}"><div class="notebook-pages"><select data-page aria-label="Not defteri sayfası">${w.pages.map(item=>`<option value="${item.id}" ${item.id===w.pageId?'selected':''}>${esc(item.name)}</option>`).join('')}</select><button data-page-list class="icon" aria-label="Sayfa listesi ve silme">☷</button><button data-page-add class="icon" aria-label="Yeni sayfa" title="Yeni sayfa · Ctrl+Shift+N">＋</button><button data-page-rename class="icon" aria-label="Sayfayı yeniden adlandır">✎</button><button data-expand class="icon" aria-label="Not defterini genişlet">⛶</button></div><div class="note-security">${security}</div><div class="note-document" contenteditable="true" role="textbox" aria-multiline="true" aria-label="${esc(page.name)} içeriği" spellcheck="true">${blocks}</div><div class="note-bottom"><span data-page-count>${page.blocks.reduce((n,b)=>n+b.text.length,0)} karakter</span><span>${w.pages.length} sayfa</span></div><details class="command-guide"><summary>/ Komutlar ve kısayollar</summary><div class="command-list">${[['/title','Başlık'],['/subtitle','Alt başlık'],['/bullet','Madde listesi'],['/check','Kontrol listesi'],['/number','Numaralı liste'],['/quote','Alıntı'],['/text','Normal metin']].map(([cmd,label])=>`<button type="button" data-command="${cmd.slice(1)}"><code>${cmd}</code><span>${label}</span></button>`).join('')}</div><p>Komut + boşluk ile yazmaya başla. Shift+Enter: aynı blokta yeni satır. Enter: yeni blok; boş maddede listeden çık. Esc: normal metne geç. Tab / Shift+Tab: maddeyi içeri / dışarı al. Ctrl+Z: geri al.</p></details></div>`;
 }
 export function bindNotebook(w,root,{
-  changed,askName,notify=()=>{}
+  changed,askName,notify=()=>{},deleted=()=>{}
 }){
   let active=pageOf(w).blocks[0]?.id,lastEdit=0,composing=false,menuIndex=0,menuItems=[],dismissedCommand=null;
   const menu=document.getElementById('slash-menu')||Object.assign(document.body.appendChild(document.createElement('div')),{
@@ -69,6 +70,7 @@ export function bindNotebook(w,root,{
     lastEdit=typing?now:0;
   };
   const sync=()=>{
+    const hints=root.querySelectorAll('.block-input'),empty=pageOf(w).blocks.every(b=>!b.text.trim());hints.forEach((input,index)=>{input.dataset.placeholder=index===0&&empty?'Yazmaya başla veya / komutunu kullan…':'';});
     const raw=w.pages.find(page=>page.id===w.pageId);
     w.text=w.pages.some(page=>page.encrypted)?'':pageOf(w).blocks.map(block=>block.text).join('\n\n');
     if(raw.encrypted&&isPageOpen(raw))saveOpenedPage(raw,w.id).then(changed).catch(error=>notify(error.message));
@@ -347,11 +349,21 @@ export function bindNotebook(w,root,{
   }
   function bind(){
     const area=editor();
+    const picker=root.querySelector('[data-page]');picker.setAttribute('aria-haspopup','dialog');picker.onpointerdown=e=>{if(e.button===0){e.preventDefault();root.querySelector('[data-page-list]').click();}};
     root.querySelector('[data-page]').onchange=e=>{
       hideMenu();
       w.pageId=e.target.value;
       sync();
       draw();
+    };
+    root.querySelector('[data-page-list]').onclick=()=>{
+      const dialog=document.createElement('dialog');dialog.className='manage-dialog';dialog.setAttribute('aria-label','Not sayfaları');
+      dialog.innerHTML='<header><h2>Not sayfaları</h2><button data-close aria-label="Kapat">×</button></header><div class="manage-list"></div>';document.body.append(dialog);
+      const list=dialog.querySelector('.manage-list');
+      const paint=()=>{list.replaceChildren();for(const item of w.pages){const row=document.createElement('div'),select=document.createElement('button'),remove=document.createElement('button');select.textContent=item.name;select.onclick=()=>{w.pageId=item.id;dialog.close();sync();draw();};remove.textContent='×';remove.setAttribute('aria-label',item.name+' sayfasını sil');remove.onclick=async()=>{
+        const nonempty=item.encrypted||item.blocks.some(block=>block.text.trim());if(nonempty&&!await confirmAction('Sayfayı sil',item.name+' Son silinenler alanına taşınacak.'))return;
+        try{await deleted(w,item);forgetNotebook(w.id,item.id);await lockPage(item);w.pages=w.pages.filter(page=>page.id!==item.id);if(!w.pages.length)w.text='';pageOf(w);sync();draw();paint();}catch(error){notify(error.message);}
+      };row.append(select,remove);list.append(row);}};paint();dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.onclose=()=>{dialog.remove();root.querySelector('[data-page-list]')?.focus();};dialog.showModal();
     };
     root.querySelector('[data-page-add]').onclick=()=>{
       const page={
@@ -387,12 +399,12 @@ export function bindNotebook(w,root,{
       };
       dialog.showModal();
       bindNotebook(w,dialog.querySelector('.expanded-notebook'),{
-        changed,askName
+        changed,askName,notify,deleted
       });
       dialog.querySelector('.note-document')?.focus();
     };
     const raw=()=>w.pages.find(page=>page.id===w.pageId);
-    const securityAction=async action=>{try{root.inert=true;if(await action()===false)return;histories.delete(w.id+':'+w.pageId);w.text=w.pages.some(page=>page.encrypted)?'':w.text;changed();hideMenu();draw();for(const sibling of document.querySelectorAll('[data-notebook-widget="'+w.id+'"]')){const owner=sibling.parentElement;if(owner===root)continue;owner.innerHTML=renderNotebook(w);bindNotebook(w,owner,{changed,askName,notify});}}catch(error){notify(error.message);}finally{root.inert=false;}};
+    const securityAction=async action=>{try{root.inert=true;if(await action()===false)return;histories.delete(w.id+':'+w.pageId);w.text=w.pages.some(page=>page.encrypted)?'':w.text;changed();hideMenu();draw();for(const sibling of document.querySelectorAll('[data-notebook-widget="'+w.id+'"]')){const owner=sibling.parentElement;if(owner===root)continue;owner.innerHTML=renderNotebook(w);bindNotebook(w,owner,{changed,askName,notify,deleted});}}catch(error){notify(error.message);}finally{root.inert=false;}};
     root.querySelector('[data-page-protect]')?.addEventListener('click',()=>securityAction(async()=>{const password=await askPassword({title:'Sayfaya PIN koy',confirm:true});if(password===null)return false;await protectPage(raw(),w.id,password);w.text='';}));
     root.querySelector('[data-page-unlock]')?.addEventListener('click',()=>securityAction(async()=>{const password=await askPassword({title:'Sayfanın kilidini aç',pin:raw().encrypted?.credential==='pin'});if(password===null)return false;await unlockPage(raw(),w.id,password);}));
     root.querySelector('[data-page-repin]')?.addEventListener('click',()=>securityAction(async()=>{const pin=await askPassword({title:raw().encrypted?.credential==='pin'?'PIN değiştir':'4 haneli PIN’e geç',confirm:true});if(pin===null)return false;await protectPage(raw(),w.id,pin);}));

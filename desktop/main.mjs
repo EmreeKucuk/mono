@@ -4,6 +4,8 @@ import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import electronUpdater from 'electron-updater';
 import {createUpdateController} from './updates.mjs';
+import {createWorkspaceBridge} from './workspace.mjs';
+import {clipboardItems} from '../public/clipboard-model.js';
 import {createClipboardController} from './clipboard.mjs';
 import {appOrigin,validPolicy,canNotify,validReminders} from './policy.mjs';
 const folder=dirname(fileURLToPath(import.meta.url));
@@ -13,6 +15,8 @@ app.setAppUserModelId('com.mono.dashboard');
 const primary=app.requestSingleInstanceLock();if(!primary)app.quit();
 app.on('second-instance',()=>{win?.show();win?.focus();});
 let updates;
+const overlays=new Map(),workspaceBridge=createWorkspaceBridge();
+const sendClipboard=()=>{for(const window of [win,...overlays.values()])if(window&&!window.isDestroyed())window.webContents.send('mono:clipboard-changed');};
 let win,tray,quitting=false,history={enabled:true,items:[]},reminders=[],delivered=new Set(),policy={active:false,until:0,allowed:[]},saving=Promise.resolve(),storageError='',clipboardError='';
 const historyState=()=>({...history,durable:!storageError&&safeStorage.isEncryptionAvailable(),error:clipboardError||storageError});
 const historyPath=()=>resolve(app.getPath('userData'),'clipboard.encrypted');
@@ -23,7 +27,7 @@ function persistHistory(){
     await writeFile(historyPath()+'.tmp',safeStorage.encryptString(JSON.stringify({...history,delivered:[...delivered].slice(-2000)})),{flush:true});
     await rename(historyPath()+'.tmp',historyPath());storageError='';
   }).catch(error=>{
-    storageError='Şifreli cihaz kaydı başarısız; geçmiş bellekte tutuluyor.';win?.webContents.send('mono:clipboard-changed');throw error;
+    storageError='Şifreli cihaz kaydı başarısız; geçmiş bellekte tutuluyor.';sendClipboard();throw error;
   });
   win?.webContents.send('mono:clipboard-changed');return saving;
 }
@@ -37,9 +41,10 @@ async function capture(options){
   catch(error){clipboardStatus(error);throw error;}
 }
 function authorize(event){
-  if(event.sender!==win?.webContents||event.senderFrame!==win.webContents.mainFrame||new URL(event.senderFrame.url).origin!==origin)throw Error('Yetkisiz masaüstü isteği.');
+  const owner=[win,...overlays.values()].find(w=>w?.webContents===event.sender);
+  if(!owner||event.senderFrame!==owner.webContents.mainFrame||new URL(event.senderFrame.url).origin!==origin)throw Error('Yetkisiz masaüstü isteği.');
 }
-const handle=(name,fn)=>ipcMain.handle('mono:'+name,(event,input)=>{authorize(event);return fn(input);});
+const handle=(name,fn)=>ipcMain.handle('mono:'+name,(event,input)=>{authorize(event);return fn(input,event);});
 function notify(input){
   if(!canNotify(policy,input?.category||'reminder'))return false;
   if(!Notification.isSupported())return false;
@@ -55,7 +60,7 @@ function spotifyAuth(url){
 }
 async function start(){
 await app.whenReady();
-try{history=JSON.parse(safeStorage.decryptString(await readFile(historyPath())));if(!Array.isArray(history.items))throw Error();delivered=new Set(Array.isArray(history.delivered)?history.delivered.filter(id=>typeof id==='string').slice(-2000):[]);history={enabled:true,items:history.items.filter(i=>typeof i?.id==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(i.id)&&typeof i.text==='string'&&Number.isFinite(i.at)).slice(0,100).map(i=>({id:i.id,text:i.text.slice(0,20000),at:i.at,pinned:i.pinned===true}))};}catch{history={enabled:true,items:[]};}
+try{history=JSON.parse(safeStorage.decryptString(await readFile(historyPath())));if(!Array.isArray(history.items))throw Error();delivered=new Set(Array.isArray(history.delivered)?history.delivered.filter(id=>typeof id==='string').slice(-2000):[]);history={enabled:true,days:[0,1,3,7,30].includes(history.days)?history.days:3,items:history.items.filter(i=>typeof i?.id==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(i.id)&&typeof i.text==='string'&&Number.isFinite(i.at)).slice(0,100).map(i=>({id:i.id,text:i.text.slice(0,20000),at:i.at,pinned:i.pinned===true}))};}catch{history={enabled:true,items:[]};}
 session.defaultSession.setPermissionRequestHandler((contents,permission,callback,details)=>callback(contents===win?.webContents&&new URL(details.requestingUrl||contents.getURL()).origin===origin&&['notifications','clipboard-sanitized-write'].includes(permission)));
 win=new BrowserWindow({width:1320,height:900,minWidth:320,minHeight:450,title:'MONO '+app.getVersion(),icon:resolve(folder,'icon.png'),backgroundColor:'#111312',autoHideMenuBar:true,show:process.env.MONO_DESKTOP_TEST!=='1',webPreferences:{preload:resolve(folder,'preload.cjs'),additionalArguments:['--mono-origin='+origin,'--mono-version='+app.getVersion()],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,backgroundThrottling:false}});
 win.on('page-title-updated',event=>{event.preventDefault();win.setTitle('MONO '+app.getVersion());});
@@ -75,9 +80,25 @@ updates=createUpdateController({updater:electronUpdater.autoUpdater,enabled:app.
 });
 handle('update-status',()=>updates.status());
 handle('update-check',()=>updates.check());
-handle('update-install',async confirmed=>{if(confirmed!==true)throw Error('Yeniden başlatma onayı gerekli.');await updates.restart();return true;});
+handle('update-install',async(confirmed,event)=>{if(event.sender!==win.webContents)throw Error('Ana pencereden güncelle.');if(confirmed!==true)throw Error('Yeniden başlatma onayı gerekli.');await updates.restart();return true;});
 const updateTimer=setInterval(()=>updates.check(),4*60*60*1000);updateTimer.unref();
 win.webContents.on('did-finish-load',()=>updates.check());
+handle('clipboard-configure',async input=>{if(![0,1,3,7,30].includes(input?.days))throw Error('Geçersiz saklama süresi.');history.days=input.days;history.items=clipboardItems(history.items,input.days);await persistHistory();return historyState();});
+handle('clipboard-cloud-action',value=>{if(!['remove','pin'].includes(value?.kind)||typeof value.text!=='string'||value.text.length>20000||value.kind==='pin'&&typeof value.pinned!=='boolean')throw Error('Geçersiz clipboard işlemi.');win.webContents.send('mono:clipboard-action',{kind:value.kind,text:value.text,pinned:value.pinned===true,at:Date.now()});return true;});
+handle('clipboard-copy-text',async text=>{if(typeof text!=='string'||text.length>20000)throw Error('Geçersiz pano metni.');await clipboard.writeText(text);return true;});
+handle('workspace-publish',(value,event)=>{
+  if(event.sender!==win.webContents)throw Error('Yalnızca ana pencere çalışma alanını yayınlayabilir.');workspaceBridge.publish(value);
+  for(const [id,window] of overlays){try{window.webContents.send('mono:overlay-state',workspaceBridge.read(id));}catch{window.close();}}
+});
+handle('workspace-read',(_,event)=>{const id=[...overlays].find(([,window])=>window.webContents===event.sender)?.[0];if(!id)throw Error('Mini pencere bulunamadı.');return workspaceBridge.read(id);});
+handle('workspace-commit',(value,event)=>{const id=[...overlays].find(([,window])=>window.webContents===event.sender)?.[0];if(!id)throw Error('Mini pencere bulunamadı.');const result=workspaceBridge.commit(id,value);win.webContents.send('mono:overlay-edit',result);return result;});
+handle('workspace-open',async(id,event)=>{
+  if(event.sender!==win.webContents)throw Error('Mini pencereyi ana pencereden aç.');const data=workspaceBridge.read(id),existing=overlays.get(id);if(existing){existing.show();existing.focus();return;}
+  const prefs=data.state.settings,window=new BrowserWindow({width:prefs.overlayWidth,height:prefs.overlayHeight,minWidth:280,minHeight:240,resizable:true,alwaysOnTop:true,title:data.state.widgets[0].title+' · MONO',autoHideMenuBar:true,backgroundColor:'#111312',icon:resolve(folder,'icon.png'),webPreferences:{preload:resolve(folder,'preload.cjs'),additionalArguments:['--mono-origin='+origin,'--mono-version='+app.getVersion(),'--mono-overlay='+id],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,backgroundThrottling:false}});
+  overlays.set(id,window);window.on('page-title-updated',event=>{event.preventDefault();window.setTitle(data.state.widgets[0].title+' · MONO');});window.on('closed',()=>overlays.delete(id));window.webContents.setWindowOpenHandler(({url})=>{if(/^https?:\/\//.test(url))shell.openExternal(url);return {action:'deny'};});window.webContents.on('will-navigate',(e,url)=>{if(new URL(url).origin!==origin)e.preventDefault();});await window.loadURL(origin);
+});
+handle('overlay-top',(value,event)=>{const window=[...overlays.values()].find(w=>w.webContents===event.sender);if(!window||typeof value!=='boolean')throw Error('Geçersiz mini pencere.');window.setAlwaysOnTop(value);return value;});
+handle('overlay-close',(_,event)=>{const window=[...overlays.values()].find(w=>w.webContents===event.sender);window?.close();});
 handle('clipboard-list',historyState);
 handle('clipboard-watch',async enabled=>{if(typeof enabled!=='boolean')throw Error('Geçersiz pano ayarı.');history.enabled=true;await persistHistory();await capture();return historyState();});
 handle('clipboard-capture',async()=>{await capture();return historyState();});

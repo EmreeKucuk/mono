@@ -1,3 +1,4 @@
+import {clipboardItems} from '../public/clipboard-model.js';
 import {randomUUID} from 'node:crypto';
 
 // Electron 44's clipboard methods are asynchronous. Serialize reads, writes and
@@ -18,7 +19,9 @@ export function createClipboardController({clipboard,getHistory,persist}){
     if(capturePending)return capturePending;
     const job=enqueue(async()=>{
       if(automatic&&!getHistory().enabled)return;
-      const text=await readText(),history=getHistory();
+      const history=getHistory(),pruned=clipboardItems(history.items,history.days??3);
+      if(pruned.length!==history.items.length){history.items=pruned;await persist();}
+      const text=await readText();
       if(automatic&&!history.enabled)return;
       if(!text.trim()||text===lastText)return;
       const bounded=text.slice(0,20000),existing=history.items.find(item=>item.text===bounded);
