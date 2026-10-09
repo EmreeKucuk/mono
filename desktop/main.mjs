@@ -78,6 +78,7 @@ updates=createUpdateController({updater:electronUpdater.autoUpdater,enabled:app.
   prepareQuit:async()=>{await saving;if(storageError)throw Error('Clipboard kaydı tamamlanamadı. Önce kayıt sorununu çöz.');},
   install:()=>{quitting=true;try{electronUpdater.autoUpdater.quitAndInstall(false,true);}catch(error){quitting=false;throw error;}}
 });
+electronUpdater.autoUpdater.on('error',()=>{quitting=false;});
 handle('update-status',()=>updates.status());
 handle('update-check',()=>updates.check());
 handle('update-install',async(confirmed,event)=>{if(event.sender!==win.webContents)throw Error('Ana pencereden güncelle.');if(confirmed!==true)throw Error('Yeniden başlatma onayı gerekli.');await updates.restart();return true;});

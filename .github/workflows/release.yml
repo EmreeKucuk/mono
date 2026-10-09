@@ -2,11 +2,18 @@ name: Windows release
 on:
   push:
     tags: ['v*']
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Build the existing version tag (for example v1.3.0)'
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
   release:
@@ -14,10 +21,13 @@ jobs:
     permissions:
       contents: write
     env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
       MONO_BROWSER_CHANNEL: chromium
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -26,28 +36,75 @@ jobs:
         shell: pwsh
         run: |
           $version = node -p "require('./package.json').version"
-          if ($env:GITHUB_REF -ne "refs/tags/v$version") { throw "Run on the v$version tag; package version must match." }
+          if ($env:RELEASE_TAG -ne "v$version") { throw "Tag must be v$version; package version must match." }
           if ('${{ github.repository }}' -ne 'EmreeKucuk/mono') { throw 'Configure the update feed before releasing a fork.' }
-      - run: npm ci
-      - run: npx playwright install chromium
-      - run: npm test
-      - run: npm run build
-      - name: Package without publishing
-        run: npm run desktop:build -- --publish never
-      - name: Verify release metadata
-        run: node scripts/verify-release.mjs
-      - name: Upload complete draft and publish
+      - name: Leave complete published releases unchanged
+        id: existing
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = $env:GITHUB_REF_NAME
-          gh release view $tag 2>$null
-          if ($LASTEXITCODE -eq 0) { throw 'Release already exists; use a new version and tag.' }
-          gh release create $tag --verify-tag --draft --title "MONO $tag" --generate-notes
+          $version = node -p "require('./package.json').version"
+          $existing = gh release view $env:RELEASE_TAG --json assets,isPrerelease 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $release = $existing | ConvertFrom-Json
+            if ($release.isPrerelease) { throw 'Use a stable release for desktop updates.' }
+            $names = @($release.assets.name)
+            $expected = @("MONO-Setup-$version.exe", "MONO-Setup-$version.exe.blockmap", 'latest.yml')
+            if (@($expected | Where-Object { $_ -notin $names }).Count -eq 0) {
+              'complete=true' >> $env:GITHUB_OUTPUT
+              'Release already contains all update assets; kept unchanged.' >> $env:GITHUB_STEP_SUMMARY
+            } elseif ($release.assets.Count -gt 0) {
+              throw 'Release is partially uploaded. Recover the verified files from the original workflow artifact or publish a new version; do not overwrite an installer.'
+            }
+          }
+          exit 0
+      - if: steps.existing.outputs.complete != 'true'
+        run: npm ci
+      - if: steps.existing.outputs.complete != 'true'
+        run: npx playwright install chromium
+      - if: steps.existing.outputs.complete != 'true'
+        run: npm test
+      - if: steps.existing.outputs.complete != 'true'
+        run: npm run build
+      - name: Package without publishing
+        if: steps.existing.outputs.complete != 'true'
+        run: npm run desktop:build -- --publish never
+      - name: Verify release metadata
+        if: steps.existing.outputs.complete != 'true'
+        run: node scripts/verify-release.mjs
+      - uses: actions/upload-artifact@v4
+        if: steps.existing.outputs.complete != 'true'
+        with:
+          name: mono-${{ env.RELEASE_TAG }}-${{ github.run_id }}
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml
+          if-no-files-found: error
+      - name: Upload complete release (metadata last)
+        if: steps.existing.outputs.complete != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG
+          $existing = gh release view $tag --json assets,isDraft,isPrerelease 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $release = $existing | ConvertFrom-Json
+            if ($release.isPrerelease) { throw 'Stable desktop updates require a stable release.' }
+            if ($release.assets.Count -gt 0) {
+              throw 'Release already has assets. Do not replace published installers; use a new version/tag. For an empty release, rerun this workflow.'
+            }
+          } else {
+            gh release create $tag --verify-tag --draft --title "MONO $tag" --generate-notes
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $version = node -p "require('./package.json').version"
+          $installer = "release/MONO-Setup-$version.exe"
+          gh release upload $tag $installer "$installer.blockmap"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $assets = @((Get-ChildItem 'release/*.exe').FullName) + @((Get-ChildItem 'release/*.blockmap').FullName) + @((Resolve-Path 'release/latest.yml').Path)
-          gh release upload $tag @assets
+          gh release upload $tag 'release/latest.yml'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           gh release edit $tag --draft=false --latest
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

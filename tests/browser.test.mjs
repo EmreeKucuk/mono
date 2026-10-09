@@ -497,11 +497,11 @@ test('desktop update UI blocks offline unsaved edits, recovers install failures 
   await page.waitForFunction(()=>document.querySelector('.profile')?.textContent.includes('updates@example.com'));
   assert.equal(await page.locator('#desktop-update').textContent(),'Güncelle ve yeniden başlat');
   offline=true;await page.locator('.note-document').click();await page.keyboard.press('Control+a');await page.keyboard.type('Saved before update');await page.waitForTimeout(800);
-  await page.locator('#desktop-update').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('henüz kaydedilmedi'));
+  await page.locator('#desktop-update').click();await page.locator('.update-dialog [data-update]').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('henüz kaydedilmedi'));await page.locator('.update-dialog [data-close]').click();
   assert.equal(await page.evaluate(()=>installCalls),0);assert.equal(await page.locator('#app').evaluate(app=>app.inert),false);
   offline=false;await page.locator('#save-status').click();await page.waitForFunction(()=>document.querySelector('#save-status').textContent.includes('Kaydedildi'));
-  await page.locator('#desktop-update').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Installer test failure');assert.equal(await page.evaluate(()=>installCalls),1);assert.equal(await page.locator('#app').evaluate(app=>app.inert),false);
-  await page.evaluate(()=>{failInstall=false;});await page.locator('#desktop-update').click();await page.waitForFunction(()=>installCalls===2&&document.querySelector('#app').inert);
+  await page.locator('#desktop-update').click();await page.locator('.update-dialog [data-update]').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Installer test failure');assert.match(await page.locator('.update-dialog [data-explanation]').textContent(),/Installer test failure/);await page.locator('.update-dialog [data-close]').click();assert.equal(await page.evaluate(()=>installCalls),1);assert.equal(await page.locator('#app').evaluate(app=>app.inert),false);
+  await page.evaluate(()=>{failInstall=false;});await page.locator('#desktop-update').click();await page.locator('.update-dialog [data-update]').click();await page.waitForFunction(()=>installCalls===2&&document.querySelector('#app').inert);
   assert.equal(remote.widgets[0].pages[0].blocks[0].text,'Saved before update');assert.deepEqual(errors,[]);await context.close();
 });
 
@@ -545,4 +545,36 @@ test('detached notes render alone, commit edits through native bridge and can to
   const context=await browser.newContext({serviceWorkers:'block',viewport:{width:420,height:520}});
   await context.addInitScript(()=>{window.commits=[];window.topValue=true;let version=1;const state={widgets:[{id:'detached',type:'note',title:'Detached note',text:'Original',grid:{slot:0,cols:1,rows:1}}],events:[],gridColumns:3,settings:{},activeDeskId:'overlay',desks:[{id:'overlay',name:'Mini'}]};window.monoDesktop={overlayId:'detached',clipboard:{onChange:()=>{},list:async()=>({enabled:true,durable:true,items:[]})},workspace:{read:async()=>({state,version}),onChange:()=>{},onEdit:()=>{},commit:async value=>{window.commits.push(value);return {version:++version};},top:async value=>{topValue=value;return value;},close:async()=>{}}};});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.waitForFunction(()=>document.querySelector('.note-document')?.textContent==='Original');assert.equal(await page.locator('.widget').count(),1);assert.equal(await page.locator('#workspace-sidebar').count(),0);await page.locator('.note-document').click();await page.keyboard.press('Control+a');await page.keyboard.type('From compact window');await page.waitForFunction(()=>commits.some(value=>value.widget.text==='From compact window'));await page.locator('[data-overlay-top]').click();assert.equal(await page.evaluate(()=>topValue),false);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);await context.close();
+});
+
+test('update wizard explains incomplete releases, tracks downloads and reflows at 320 px',async()=>{
+  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:320,height:700}});
+  await context.addInitScript(()=>{
+    let listener;window.checkCalls=0;
+    window.monoDesktop={updates:{
+      status:async()=>({phase:'error',currentVersion:'1.2.4',message:'Yeni GitHub release eksik: latest.yml bulunamadı.'}),
+      onChange:fn=>{listener=fn;},
+      check:async()=>{window.checkCalls++;const value={phase:'downloading',currentVersion:'1.2.4',version:'1.3.1',percent:25};listener(value);return value;},
+      install:async()=>true
+    }};
+    window.updateEvent=value=>listener(value);
+  });
+  const page=await context.newPage();await page.goto(base);
+  await page.waitForFunction(()=>document.querySelector('#desktop-update')?.textContent==='Güncellemeyi yeniden dene');
+  // Sidebar is hidden on narrow screens; test the update UI independently of layout.
+  await page.locator('#desktop-update').evaluate(button=>button.click());
+  const dialog=page.getByRole('dialog',{name:'MONO güncellemesi'});await dialog.waitFor();
+  assert.equal(await page.evaluate(()=>checkCalls),1);
+  assert.equal(await dialog.locator('progress').getAttribute('value'),'25');
+  assert.ok(await dialog.locator('[data-update]').isDisabled());
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.keyboard.press('Escape');assert.equal(await page.locator('.update-dialog').count(),0);
+  await page.evaluate(()=>updateEvent({phase:'error',currentVersion:'1.2.4',message:'Yeni GitHub release eksik: latest.yml bulunamadı.'}));
+  // Reopening through a downloading state should not schedule another check.
+  await page.evaluate(()=>updateEvent({phase:'downloading',currentVersion:'1.2.4',version:'1.3.1',percent:75}));
+  await page.locator('#desktop-update').evaluate(button=>button.click());assert.equal(await page.evaluate(()=>checkCalls),1);
+  await page.evaluate(()=>updateEvent({phase:'error',currentVersion:'1.2.4',message:'Yeni GitHub release eksik: latest.yml bulunamadı.'}));
+  assert.match(await dialog.locator('[data-explanation]').textContent(),/latest.yml/);assert.ok(await dialog.locator('[data-update]').isEnabled());
+  await page.evaluate(()=>updateEvent({phase:'ready',currentVersion:'1.2.4',version:'1.3.1',percent:100}));
+  assert.equal(await dialog.locator('[data-update]').textContent(),'Kur ve yeniden aç');await page.keyboard.press('Escape');await context.close();
 });
