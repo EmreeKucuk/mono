@@ -69,7 +69,7 @@ jobs:
         run: npm run build
       - name: Package without publishing
         if: steps.existing.outputs.complete != 'true'
-        run: npm run desktop:build -- --publish never
+        run: npm run desktop:build
       - name: Verify release metadata
         if: steps.existing.outputs.complete != 'true'
         run: node scripts/verify-release.mjs

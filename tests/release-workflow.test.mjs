@@ -20,3 +20,18 @@ test('release automation supports website publishing and manual repair of empty 
   assert.ok(upload.indexOf('"$installer.blockmap"')<upload.indexOf("gh release upload $tag 'release/latest.yml'"));
   assert.match(upload,/assets.Count -gt 0/);assert.ok(!upload.includes('--clobber'));
 });
+
+test('packaging passes a single never policy to the installed Electron Builder parser',async()=>{
+  const workflow=yaml.load(await readFile(new URL('../.github/workflows/release.yml',import.meta.url),'utf8'));
+  const pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+  const step=workflow.jobs.release.steps.find(step=>step.name==='Package without publishing');
+  assert.equal(step.run,'npm run desktop:build');
+  assert.ok(!step.env?.GH_TOKEN,'Packaging must not require a publication token');
+  const {configureBuildCommand,createYargs,normalizeOptions}=require('electron-builder/out/builder');
+  const args=pkg.scripts['desktop:build'].split(/\s+/).slice(1);
+  const parsed=normalizeOptions(configureBuildCommand(createYargs()).parse(args));
+  assert.equal(parsed.publish,'never','Duplicate CLI flags turn the policy into an array and enable publishing');
+  // Reproduce the original failure with the real installed parser.
+  const broken=normalizeOptions(configureBuildCommand(createYargs()).parse([...args,'--publish','never']));
+  assert.deepEqual(broken.publish,['never','never']);
+});
