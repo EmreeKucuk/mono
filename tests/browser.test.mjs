@@ -568,7 +568,7 @@ test('update wizard explains incomplete releases, tracks downloads and reflows a
   assert.equal(await dialog.locator('progress').getAttribute('value'),'25');
   assert.ok(await dialog.locator('[data-update]').isDisabled());
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  await page.keyboard.press('Escape');assert.equal(await page.locator('.update-dialog').count(),0);
+  await page.keyboard.press('Escape');await page.locator('.update-dialog').waitFor({state:'detached'});
   await page.evaluate(()=>updateEvent({phase:'error',currentVersion:'1.2.4',message:'Yeni GitHub release eksik: latest.yml bulunamadı.'}));
   // Reopening through a downloading state should not schedule another check.
   await page.evaluate(()=>updateEvent({phase:'downloading',currentVersion:'1.2.4',version:'1.3.1',percent:75}));
@@ -619,7 +619,7 @@ test('Island closes after button, calendar, volume and display interactions; onl
       await page.keyboard.press('Tab');await closed(); // Moving from text to Save releases the deferred close.
       await open();await page.locator('#city').focus();await leave();await page.keyboard.press('Enter');await closed();
       assert.equal(await page.locator('#city-open').textContent(),'Ankara');
-      await open();await page.locator('#city-open').click();await page.locator('#display').selectOption('2');await leave();await closed();
+      await open();await page.locator('#city-open').click();await page.locator('#display').focus();await page.locator('#display').selectOption('2');await leave();await closed();
       await open();await page.locator('#settings-back').click();
       await page.evaluate(()=>pointerIsland(false));await closed(); // Native cursor can exit the entire transparent window.
       // Re-entering during the short departure delay cancels the pending close.
@@ -637,4 +637,64 @@ test('Island receives active desktop data and header returns when Island is hidd
   const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1440,height:900}}),page=await context.newPage();
   await context.addInitScript(()=>{let listener;let value={enabled:true,visible:true,city:'İstanbul'};window.monoDesktop={zone:async()=>true,reminders:{sync:async()=>true},island:{status:async()=>value,sync:async()=>value,toggle:async()=>{value={...value,enabled:!value.enabled,visible:!value.visible};listener?.(value);return value;},onStatus:fn=>{listener=fn;},onCity:()=>{},onNavigate:fn=>{window.islandNavigate=fn;}}};});
   await context.route('**/api/weather?**',route=>route.fulfill({json:{city:'İstanbul',temperature:21,summary:'Bulutlu'}}));await page.goto(base);await page.waitForFunction(()=>document.querySelector('.topbar-date').hidden);assert.equal(await page.locator('.topbar-date').isVisible(),false);await page.locator('#desktop-island').click();await page.waitForFunction(()=>!document.querySelector('.topbar-date').hidden);assert.equal(await page.locator('.topbar-date').isVisible(),true);await page.evaluate(()=>islandNavigate({view:'calendar',date:'2026-11-03'}));assert.match(await page.locator('.calendar-head').first().textContent(),/Kasım/);await context.close();
+});
+
+
+test('Island settings persist, sync with tray changes, recover from save errors and release listeners',async()=>{
+  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1440,height:900}});
+  await context.route('**/api/**',route=>route.fulfill({json:{configured:false,user:null}}));
+  await context.addInitScript(()=>{
+    const listeners=new Set();
+    let enabled=localStorage.getItem('test-island-enabled')!=='false';
+    const status=()=>({enabled,visible:enabled,city:''});
+    window.islandListenerCount=()=>listeners.size;
+    window.emitIslandSetting=value=>{enabled=value;localStorage.setItem('test-island-enabled',String(value));for(const fn of listeners)fn(status());return status();};
+    window.monoDesktop={zone:async()=>true,reminders:{sync:async()=>true},island:{
+      status:async()=>status(),sync:async()=>status(),
+      setEnabled:async value=>{if(window.failIslandSave)throw Error('Disk full');return window.emitIslandSetting(value);},
+      toggle:async()=>window.emitIslandSetting(!enabled),
+      onStatus:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},onCity:()=>{},onNavigate:()=>{}
+    }};
+  });
+  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const open=async()=>{await page.locator('#profile-menu').click();await page.locator('[data-settings]').click();await page.waitForFunction(()=>!document.querySelector('[data-island-enabled]').disabled);};
+  try{
+    await page.goto(base);await open();
+    const toggle=page.getByRole('switch',{name:'Dynamic Island’ı etkinleştir'});
+    assert.equal(await toggle.isChecked(),true);
+    await toggle.focus();await page.keyboard.press('Space');
+    await page.waitForFunction(()=>document.querySelector('#island-setting-status').textContent==='Dynamic Island kapalı.');
+    assert.equal(await toggle.isChecked(),false);assert.equal(await page.locator('.topbar-date').isVisible(),true);
+    await page.keyboard.press('Escape');await page.waitForFunction(()=>islandListenerCount()===1);
+    await page.reload();await open();assert.equal(await toggle.isChecked(),false);
+    await page.evaluate(()=>emitIslandSetting(true));assert.equal(await toggle.isChecked(),true);
+    await page.evaluate(()=>{window.failIslandSave=true;});await toggle.click();
+    await page.waitForFunction(()=>document.querySelector('#island-setting-status').textContent.includes('Tercih kaydedilemedi'));
+    assert.equal(await toggle.isChecked(),true);assert.equal(await toggle.isDisabled(),false);
+    await page.evaluate(()=>{window.failIslandSave=false;});await toggle.uncheck();
+    await page.waitForFunction(()=>document.querySelector('#island-setting-status').textContent==='Dynamic Island kapalı.');
+    for(const theme of ['graphite','navy']){
+      await page.evaluate(value=>{document.documentElement.dataset.theme=value;},theme);
+      await page.setViewportSize({width:320,height:700});
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      assert.equal(await page.locator('.settings-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+    }
+    await page.keyboard.press('Escape');await page.waitForFunction(()=>islandListenerCount()===1);
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
+test('Island settings explain availability in browser and older desktop clients',async()=>{
+  const context=await browser.newContext({serviceWorkers:'block'}),page=await context.newPage();
+  await context.route('**/api/**',route=>route.fulfill({json:{configured:false,user:null}}));
+  try{
+    await page.goto(base);
+    for(const legacy of [false,true]){
+      if(legacy)await page.evaluate(()=>{window.monoDesktop={island:{}};});
+      await page.locator('#profile-menu').click();await page.locator('[data-settings]').click();
+      assert.equal(await page.locator('[data-island-enabled]').isDisabled(),true);
+      assert.match(await page.locator('#island-setting-status').textContent(),legacy?/güncelle/:/Masaüstü uygulamasında/);
+      await page.keyboard.press('Escape');
+    }
+  }finally{await context.close();}
 });

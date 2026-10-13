@@ -4,6 +4,7 @@ import {dirname,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {EMPTY_SYSTEM,workspaceSummary,islandBounds,insideSurface} from './model.mjs';
 import {startSystemBridge} from './system.mjs';
+import {createVisibilityPreference} from './visibility.mjs';
 const directory=dirname(fileURLToPath(import.meta.url));
 export async function installIsland({main,origin,test=false}){
   const file=resolve(app.getPath('userData'),'island.json');let prefs={enabled:true,displayId:null,city:'',theme:'graphite'},weather=null,weatherError='',weatherBusy=false,stopped=false,saveQueue=Promise.resolve();
@@ -42,7 +43,8 @@ export async function installIsland({main,origin,test=false}){
   handle('island:city',isIsland,async city=>{if(typeof city!=='string'||city.trim().length<2||city.length>80)throw Error('Şehir adı 2–80 karakter olmalı.');prefs.city=city.trim();weather=null;weatherError='';await persist();main.webContents.send('mono:island-city',prefs.city);await refresh();return snapshot();});
   handle('island:display',isIsland,async id=>{if(!screen.getAllDisplays().some(d=>d.id===id))throw Error('Ekran bulunamadı.');prefs.displayId=id;place();await persist();return snapshot();});
   handle('mono:island-status',isMain,status);
-  handle('mono:island-toggle',isMain,()=>toggle());
+  handle('mono:island-toggle',isMain,()=>visibility.toggle());
+  handle('mono:island-enabled',isMain,value=>visibility.setEnabled(value));
   handle('mono:island-sync',isMain,value=>{let changed=false;if(['graphite','navy'].includes(value?.theme)&&prefs.theme!==value.theme){prefs.theme=value.theme;changed=true;}if(typeof value?.city==='string'&&value.city.length>=2&&value.city.length<=80&&prefs.city!==value.city){prefs.city=value.city;weather=null;changed=true;void refresh();}if(changed){void persist();publish();}return status();});
   const hitListener=(event,value)=>{if(!isIsland(event)||!value||!['x','y','width','height'].every(k=>Number.isFinite(value[k])))return;const b=window.getBounds();if(value.width<100||value.width>b.width||value.height<30||value.height>b.height||value.x<0||value.y<0||value.x+value.width>b.width+1||value.y+value.height>b.height+1)return;hit=value;};ipcMain.on('island:hit',hitListener);
   window.setMenu(null);window.webContents.setVisualZoomLevelLimits(1,1).catch(()=>{});
@@ -51,8 +53,18 @@ export async function installIsland({main,origin,test=false}){
   window.webContents.on('render-process-gone',()=>{ready=false;window.hide();notifyMain();});
   window.on('blur',()=>window.webContents.send('island:blur'));
   const pointer=setInterval(()=>{if(!prefs.enabled||!ready||window.isDestroyed())return;const inside=insideSurface(screen.getCursorScreenPoint(),window.getBounds(),hit);if(inside!==interactive){interactive=inside;window.setIgnoreMouseEvents(!inside,{forward:true});window.webContents.send('island:pointer',inside);}},32);pointer.unref();window.setIgnoreMouseEvents(true,{forward:true});
-  const toggle=()=>{prefs.enabled=!prefs.enabled;if(prefs.enabled&&ready)window.showInactive();else window.hide();void persist();notifyMain();return status();};
-  const show=()=>{if(!prefs.enabled)toggle();window.show();window.focus();window.webContents.send('island:expand');};
+  const visibility=createVisibilityPreference({prefs,persist,status,apply:()=>{
+    if(stopped||window.isDestroyed())return;
+    if(prefs.enabled&&ready)window.showInactive();else window.hide();
+    notifyMain();
+  }});
+  // Tray and global shortcuts have no promise consumer; IPC callers receive errors.
+  const reportError=error=>console.error('Island tercihi kaydedilemedi:',error.message);
+  const toggle=()=>visibility.toggle().catch(reportError);
+  const show=()=>visibility.setEnabled(true).then(()=>{
+    if(stopped||window.isDestroyed())return;
+    window.show();window.focus();window.webContents.send('island:expand');
+  }).catch(reportError);
   const resume=()=>{place();void refresh();publish();};
   screen.on('display-metrics-changed',place);screen.on('display-removed',place);screen.on('display-added',place);powerMonitor.on('resume',resume);
   const shortcut=globalShortcut.register('CommandOrControl+Alt+I',show);

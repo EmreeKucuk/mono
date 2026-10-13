@@ -1,4 +1,5 @@
 import {escape} from './ui-utils.js';
+import {bindIslandSettings} from './island-settings.js';
 import {preferences} from './preferences.js';
 import {restorePage,restoreDesk,ensureTrash,deleteDesk} from './recycle-bin.js';
 import {confirmAction} from './confirm-dialog.js';
@@ -19,7 +20,12 @@ export function openAccountMenu(){
 export function openSettings(){
   const state=api.state();state.settings=preferences(state.settings);ensureTrash(state);const d=modal('Ayarlar'),body=d.querySelector('[data-content]');
   body.innerHTML=`<nav class="settings-tabs" role="tablist" aria-label="Ayar bölümleri">${[['appearance','Görünüm'],['clipboard','Clipboard'],['pages','Son silinenler'],['desks','Silinen masalar'],['connections','Bağlantılar']].map(([id,label],i)=>`<button type="button" role="tab" id="settings-tab-${id}" aria-controls="settings-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-tab="${id}">${label}</button>`).join('')}</nav>
-  <section id="settings-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance"><form class="settings-form" data-preferences>
+  <section id="settings-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance">
+  <div class="island-settings">
+    <label class="island-setting-toggle"><span>Dynamic Island’ı etkinleştir</span><input type="checkbox" role="switch" data-island-enabled aria-describedby="island-setting-help island-setting-status" checked disabled></label>
+    <p id="island-setting-help" class="help">Bu bilgisayar için kaydedilir. Çarpı düğmesi MONO’yu arka plana küçültür; tamamen kapatmak için sistem tepsisindeki MONO simgesinden Çıkış’ı seç.</p>
+    <p id="island-setting-status" class="help" role="status" aria-live="polite"></p>
+  </div><form class="settings-form" data-preferences>
   <label>Tema<select name="theme"><option value="graphite">Grafit</option><option value="navy">Koyu lacivert</option></select></label>
   <label>Grid seçimi<select name="gridMode"><option value="manual">Sütun sayısını ben seçeyim</option><option value="auto">Ekran genişliğine göre otomatik</option></select></label>
   <label>Sütun sayısı<select name="columns">${[2,3,4,5,6].map(n=>`<option value="${n}">${n} sütun</option>`).join('')}</select></label>
@@ -34,6 +40,7 @@ export function openSettings(){
   <section id="settings-pages" role="tabpanel" aria-labelledby="settings-tab-pages" hidden><p class="help">Silinen not sayfaları; PIN koruması geri getirildiğinde de korunur.</p><div data-page-trash class="manage-list"></div></section>
   <section id="settings-desks" role="tabpanel" aria-labelledby="settings-tab-desks" hidden><div data-desk-trash class="manage-list"></div></section>
   <section id="settings-connections" role="tabpanel" aria-labelledby="settings-tab-connections" hidden><div class="connection-card"><div><strong>Spotify</strong><p data-spotify-status role="status">Bağlantı kontrol ediliyor…</p></div><button data-spotify-connect>Hesabı bağla</button><button data-spotify-disconnect hidden>Bağlantıyı kaldır</button></div><p class="help">Yeni hesap bağlantıları burada yer alacak.</p></section>`;
+  bindIslandSettings(d);
   const tabs=[...body.querySelectorAll('[data-tab]')],choose=b=>{tabs.forEach(tab=>{const selected=tab===b;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;body.querySelector('#settings-'+tab.dataset.tab).hidden=!selected;});};tabs.forEach((b,i)=>{b.onclick=()=>choose(b);b.onkeydown=e=>{if(['ArrowRight','ArrowLeft','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length;choose(tabs[next]);tabs[next].focus();}};});
   const form=body.querySelector('[data-preferences]');for(const key of ['gridMode','minWidgetWidth','widgetScale','overlayWidth','overlayHeight'])form.elements[key].value=String(state.settings[key]);form.elements.resizeWidgets.checked=state.settings.resizeWidgets;form.elements.theme.value=document.documentElement.dataset.theme;form.elements.columns.value=String(state.gridColumns);
   form.onsubmit=e=>{e.preventDefault();const data=Object.fromEntries(new FormData(form));state.settings=preferences({...state.settings,...data,resizeWidgets:form.elements.resizeWidgets.checked});api.theme(data.theme);api.columns(Number(data.columns));api.changed();api.render();};

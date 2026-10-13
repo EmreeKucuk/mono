@@ -4,7 +4,7 @@ import {verifyDesktop} from './verify-desktop.mjs';
 
 const require=createRequire(import.meta.url),yaml=require('js-yaml');
 const pkg=JSON.parse(await readFile('package.json','utf8'));
-const directory='release/island-preview/win-unpacked';
+const directory=process.argv[2]||'release/island-preview/win-unpacked';
 // --dir skips Electron Builder's installer metadata step. Supply the same
 // public update feed so opening the preview does not produce a missing-file error.
 await writeFile(directory+'/resources/app-update.yml',yaml.dump({

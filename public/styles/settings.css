@@ -21,3 +21,15 @@ button.profile{width:100%;text-align:left;background:transparent;color:var(--tex
 .content{max-width:none;margin:0;width:100%}
 
 .settings-form label{margin:0;font-size:13px}.settings-form input{margin-top:0}.settings-dialog hr{border:0;border-top:1px solid var(--line);margin:22px 0}
+
+.island-settings{padding:16px;border:1px solid var(--line);border-radius:16px;margin-bottom:22px;background:var(--bg)}
+.island-setting-toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0;color:var(--text);font-size:14px;cursor:pointer}
+.island-setting-toggle input{appearance:none;flex:none;width:42px;height:24px;margin:0;border:1px solid var(--muted);border-radius:20px;background:var(--panel);position:relative;cursor:pointer}
+.island-setting-toggle input::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--muted);transition:transform 160ms ease}
+.island-setting-toggle input:checked{background:var(--accent);border-color:var(--accent)}
+.island-setting-toggle input:checked::after{transform:translateX(18px);background:var(--bg)}
+.island-setting-toggle input:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.island-setting-toggle input:disabled{cursor:default;opacity:.6}
+.island-settings .help{margin:10px 0 0;line-height:1.6}
+#island-setting-status:empty{display:none}
+@media(prefers-reduced-motion:reduce){.island-setting-toggle input::after{transition:none}}

@@ -13,7 +13,7 @@ export async function verifyDesktop(directory='release/win-unpacked'){
   if(packaged.version!==pkg.version||!packaged.dependencies?.['electron-updater'])throw Error('Missing or outdated packaged application.');
   extractFile(archive,join('node_modules','electron-updater','out','main.js'));
   extractFile(archive,join('desktop','updates.mjs'));
-  for(const file of ['host.mjs','model.mjs','system.mjs','preload.cjs','index.html','island.js','island.css']){
+  for(const file of ['visibility.mjs','host.mjs','model.mjs','system.mjs','preload.cjs','index.html','island.js','island.css']){
     const path=join('desktop','island',file);
     if(!extractFile(archive,path).equals(await readFile(path)))throw Error('Packaged Island source is outdated: '+file);
   }
