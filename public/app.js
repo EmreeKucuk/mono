@@ -6,7 +6,8 @@ import {renderDrawing,bindDrawing} from './drawing.js';
 import {isOverlay,publishWorkspace,startOverlay,overlayChanged,bindOverlayButton,hasOverlayPending} from './overlay.js';
 import {bindDesktopUpdates,installDesktopUpdates} from './desktop-updates.js';
 import {bindDashboard,installDashboard,syncDashboard,dashboardNotification} from './dashboard-features.js';
-import {bindWeather} from './weather.js';
+import {bindWeather,updateWeather} from './weather.js';
+import {bindDesktopIsland,installDesktopIsland} from './desktop-island.js';
 import {flushEncryption,hasPendingEncryption} from './note-vault.js';
 import { patchGrid } from './grid-view.js';
 import {ensureDesks,switchDesk,addDesk} from './desks.js';
@@ -44,6 +45,7 @@ try {
 } catch { /* Keep the responsive default if storage is unavailable. */ }
 function applyTheme(theme){
   document.documentElement.dataset.theme=theme==='navy'?'navy':'graphite';
+  window.dispatchEvent(new Event('mono-theme'));
   document.querySelector('meta[name="theme-color"]').content=theme==='navy'?'#0b1220':'#111312';
 }
 try{
@@ -163,7 +165,7 @@ function shell(){
   renderDesk();
   bindShell();
   bindDashboard();
-  bindWeather(askName);
+  bindWeather(askName);bindDesktopIsland();
   bindDesktopUpdates();
   configureClip();
   publishWorkspace(state);
@@ -604,6 +606,7 @@ installDesktopUpdates({notify,cancel:()=>{updatePrepared=false;},prepare:async()
   updatePrepared=true;
 }});
 if(!isOverlay())installDashboard({state:()=>state,changed,notify,askName,calendar:()=>state.widgets.filter(w=>w.type==='calendar').forEach(w=>renderWidget(w.id))});
+installDesktopIsland({weather:updateWeather,navigate:value=>{if(value.view==='capture'||value.view==='zone'){document.querySelector(value.view==='capture'?'#quick-capture-open':'#zone-open')?.click();return;}if(value.view==='calendar'&&value.date){selectedDate=value.date;const d=new Date(value.date+'T12:00:00');month=new Date(d.getFullYear(),d.getMonth(),1);}view=value.view==='calendar'?'calendar':'board';shell();}});
 shell();
 if(isOverlay()){await startOverlay({state:()=>state,replace:value=>{state=sanitizeWorkspace(value);shell();},flush:flushEncryption,notify,export:exportWorkspace});}
 else try{

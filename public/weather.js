@@ -9,6 +9,6 @@ export async function updateWeather(){
   finally{loading=false;}
 }
 export function bindWeather(askName){
-  document.querySelector('#weather').onclick=async()=>{const city=await askName({title:'Hava durumu şehri',value:localStorage.getItem('mono-weather-city')||'',maxLength:80});if(city){localStorage.setItem('mono-weather-city',city);updateWeather();}};updateWeather();
+  document.querySelector('#weather').onclick=async()=>{const city=await askName({title:'Hava durumu şehri',value:localStorage.getItem('mono-weather-city')||'',maxLength:80});if(city){localStorage.setItem('mono-weather-city',city);window.dispatchEvent(new Event('mono-weather-city'));updateWeather();}};updateWeather();
 }
 setInterval(updateWeather,1800000);

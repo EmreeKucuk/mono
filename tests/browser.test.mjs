@@ -578,3 +578,63 @@ test('update wizard explains incomplete releases, tracks downloads and reflows a
   await page.evaluate(()=>updateEvent({phase:'ready',currentVersion:'1.2.4',version:'1.3.1',percent:100}));
   assert.equal(await dialog.locator('[data-update]').textContent(),'Kur ve yeniden aç');await page.keyboard.press('Escape');await context.close();
 });
+
+test('Island hover, keyboard, calendar, weather and system controls work in both themes',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  for(const theme of ['graphite','navy']){
+    const context=await browser.newContext({serviceWorkers:'block',viewport:{width:584,height:660}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await context.route('**/island-test/**',async route=>{const name=new URL(route.request().url()).pathname.split('/').pop()||'index.html';const relative=name==='fixture.js'?'tests/fixtures/island-bridge.js':name==='checks.js'?'tests/fixtures/island-checks.js':'desktop/island/'+name;let body=await readFile(resolve(project,relative),'utf8');if(name==='index.html')body=body.replace('<script type="module" src="island.js">','<script src="fixture.js"></script><script type="module" src="island.js">').replace('</body>','<script type="module" src="checks.js"></script></body>');await route.fulfill({body,contentType:name.endsWith('.css')?'text/css':name.endsWith('.js')?'application/javascript':'text/html'});});
+    await page.goto(base+'/island-test/index.html?theme='+theme);await page.waitForFunction(()=>!!window.islandTestResults);const results=await page.evaluate(()=>islandTestResults);assert.deepEqual(results.filter(r=>!r.pass),[],JSON.stringify(results));assert.deepEqual(errors,[]);
+    await page.setViewportSize({width:320,height:620});await page.waitForTimeout(350);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.querySelector('#details').scrollWidth<=document.querySelector('#details').clientWidth));await context.close();
+  }
+});
+
+test('Island closes after button, calendar, volume and display interactions; only text editing defers mouse departure',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  for(const theme of ['graphite','navy']){
+    const context=await browser.newContext({serviceWorkers:'block',viewport:{width:584,height:660}}),page=await context.newPage(),errors=[];
+    page.on('pageerror',error=>errors.push(error.message));
+    try{
+      await context.route('**/island-test/**',async route=>{
+        const name=new URL(route.request().url()).pathname.split('/').pop()||'index.html';
+        let body=await readFile(resolve(project,name==='fixture.js'?'tests/fixtures/island-bridge.js':'desktop/island/'+name),'utf8');
+        if(name==='index.html')body=body.replace('<script type="module" src="island.js">','<script src="fixture.js"></script><script type="module" src="island.js">');
+        await route.fulfill({body,contentType:name.endsWith('.css')?'text/css':name.endsWith('.js')?'application/javascript':'text/html'});
+      });
+      await page.goto(base+'/island-test/index.html?theme='+theme);
+      const open=async()=>{await page.locator('#summary').click();await page.waitForFunction(()=>document.querySelector('#island').dataset.open==='true');};
+      const leave=()=>page.mouse.move(1,650);
+      const closed=()=>page.waitForFunction(()=>document.querySelector('#details').inert,null,{timeout:3000});
+      for(const selector of ['#preferences','.day','#play','#volume']){
+        await open();
+        if(selector!=='#preferences')await page.locator(selector).first().click();
+        await leave();await closed();
+      }
+      // An unresolved Windows command must not keep a clicked player pinned open.
+      await page.evaluate(()=>{monoIsland.command=()=>new Promise(resolve=>{window.finishIslandCommand=resolve;});});
+      await open();await page.locator('#play').click();await leave();await closed();await page.evaluate(()=>finishIslandCommand(true));
+      await open();await page.locator('#city-open').click();await page.locator('#city').fill('Anka');await leave();
+      await page.waitForTimeout(400);assert.equal(await page.locator('#details').evaluate(e=>e.inert),false);
+      await page.keyboard.type('ra');assert.equal(await page.locator('#city').inputValue(),'Ankara');
+      await page.keyboard.press('Tab');await closed(); // Moving from text to Save releases the deferred close.
+      await open();await page.locator('#city').focus();await leave();await page.keyboard.press('Enter');await closed();
+      assert.equal(await page.locator('#city-open').textContent(),'Ankara');
+      await open();await page.locator('#city-open').click();await page.locator('#display').selectOption('2');await leave();await closed();
+      await open();await page.locator('#settings-back').click();
+      await page.evaluate(()=>pointerIsland(false));await closed(); // Native cursor can exit the entire transparent window.
+      // Re-entering during the short departure delay cancels the pending close.
+      await open();await leave();await page.locator('.day').first().hover();await page.waitForTimeout(400);
+      assert.equal(await page.locator('#details').evaluate(e=>e.inert),false);await leave();await closed();
+      // A keyboard-only open is usable without a mouse departure event.
+      await page.evaluate(()=>expandIsland());await page.keyboard.press('Tab');await page.waitForTimeout(400);
+      assert.equal(await page.locator('#details').evaluate(e=>e.inert),false);await page.keyboard.press('Escape');await closed();
+      assert.deepEqual(errors,[]);
+    }finally{await context.close();}
+  }
+});
+
+test('Island receives active desktop data and header returns when Island is hidden',async()=>{
+  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1440,height:900}}),page=await context.newPage();
+  await context.addInitScript(()=>{let listener;let value={enabled:true,visible:true,city:'İstanbul'};window.monoDesktop={zone:async()=>true,reminders:{sync:async()=>true},island:{status:async()=>value,sync:async()=>value,toggle:async()=>{value={...value,enabled:!value.enabled,visible:!value.visible};listener?.(value);return value;},onStatus:fn=>{listener=fn;},onCity:()=>{},onNavigate:fn=>{window.islandNavigate=fn;}}};});
+  await context.route('**/api/weather?**',route=>route.fulfill({json:{city:'İstanbul',temperature:21,summary:'Bulutlu'}}));await page.goto(base);await page.waitForFunction(()=>document.querySelector('.topbar-date').hidden);assert.equal(await page.locator('.topbar-date').isVisible(),false);await page.locator('#desktop-island').click();await page.waitForFunction(()=>!document.querySelector('.topbar-date').hidden);assert.equal(await page.locator('.topbar-date').isVisible(),true);await page.evaluate(()=>islandNavigate({view:'calendar',date:'2026-11-03'}));assert.match(await page.locator('.calendar-head').first().textContent(),/Kasım/);await context.close();
+});

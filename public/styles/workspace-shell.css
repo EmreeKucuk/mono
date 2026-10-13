@@ -66,3 +66,5 @@
   .sidebar .profile { display:flex; }
   .toolbox { top:120px; max-height:calc(100dvh - 135px); overflow-y:auto; }
 }
+
+.topbar-date[hidden]{display:none;}

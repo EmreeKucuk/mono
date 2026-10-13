@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import electronUpdater from 'electron-updater';
+import {installIsland} from './island/host.mjs';
 import {createUpdateController} from './updates.mjs';
 import {createWorkspaceBridge} from './workspace.mjs';
 import {clipboardItems} from '../public/clipboard-model.js';
@@ -14,7 +15,7 @@ if(process.env.MONO_DESKTOP_DATA_DIR)app.setPath('userData',resolve(process.env.
 app.setAppUserModelId('com.mono.dashboard');
 const primary=app.requestSingleInstanceLock();if(!primary)app.quit();
 app.on('second-instance',()=>{win?.show();win?.focus();});
-let updates;
+let updates,island,lastWorkspace;
 const overlays=new Map(),workspaceBridge=createWorkspaceBridge();
 const sendClipboard=()=>{for(const window of [win,...overlays.values()])if(window&&!window.isDestroyed())window.webContents.send('mono:clipboard-changed');};
 let win,tray,quitting=false,history={enabled:true,items:[]},reminders=[],delivered=new Set(),policy={active:false,until:0,allowed:[]},saving=Promise.resolve(),storageError='',clipboardError='';
@@ -72,7 +73,7 @@ win.webContents.on('will-navigate',(event,url)=>{
 win.on('close',event=>{if(!quitting){event.preventDefault();win.hide();}});
 win.webContents.on('did-fail-load',(_,code,message,url,isMain)=>{if(isMain&&code!==-3)win.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent('<html lang="tr"><body style="background:#111312;color:#eee;font:16px system-ui;padding:40px"><h1>MONO yüklenemedi</h1><p>Bağlantını ve yayın adresini kontrol edip uygulamayı yeniden aç.</p></body></html>'));});
 const image=nativeImage.createFromPath(resolve(folder,'icon.png')).resize({width:24,height:24});
-tray=new Tray(image);tray.setToolTip('MONO '+app.getVersion());tray.setContextMenu(Menu.buildFromTemplate([{label:'MONO’yu aç',click:()=>{win.show();win.focus();}},{label:'Çıkış',click:()=>{quitting=true;app.quit();}}]));tray.on('double-click',()=>{win.show();win.focus();});
+tray=new Tray(image);tray.setToolTip('MONO '+app.getVersion());tray.setContextMenu(Menu.buildFromTemplate([{label:'MONO’yu aç',click:()=>{win.show();win.focus();}},{label:'Dynamic Island göster / gizle',click:()=>island?.toggle()},{label:'Island’ı klavyeyle aç · Ctrl+Alt+I',click:()=>island?.show()},{label:'Çıkış',click:()=>{quitting=true;app.quit();}}]));tray.on('double-click',()=>{win.show();win.focus();});
 updates=createUpdateController({updater:electronUpdater.autoUpdater,enabled:app.isPackaged&&process.env.MONO_DESKTOP_TEST!=='1',version:app.getVersion(),
   publish:value=>{if(win&&!win.isDestroyed())win.webContents.send('mono:update-changed',value);},
   prepareQuit:async()=>{await saving;if(storageError)throw Error('Clipboard kaydı tamamlanamadı. Önce kayıt sorununu çöz.');},
@@ -88,7 +89,7 @@ handle('clipboard-configure',async input=>{if(![0,1,3,7,30].includes(input?.days
 handle('clipboard-cloud-action',value=>{if(!['remove','pin'].includes(value?.kind)||typeof value.text!=='string'||value.text.length>20000||value.kind==='pin'&&typeof value.pinned!=='boolean')throw Error('Geçersiz clipboard işlemi.');win.webContents.send('mono:clipboard-action',{kind:value.kind,text:value.text,pinned:value.pinned===true,at:Date.now()});return true;});
 handle('clipboard-copy-text',async text=>{if(typeof text!=='string'||text.length>20000)throw Error('Geçersiz pano metni.');await clipboard.writeText(text);return true;});
 handle('workspace-publish',(value,event)=>{
-  if(event.sender!==win.webContents)throw Error('Yalnızca ana pencere çalışma alanını yayınlayabilir.');workspaceBridge.publish(value);
+  if(event.sender!==win.webContents)throw Error('Yalnızca ana pencere çalışma alanını yayınlayabilir.');workspaceBridge.publish(value);lastWorkspace=value;island?.publishWorkspace(value);
   for(const [id,window] of overlays){try{window.webContents.send('mono:overlay-state',workspaceBridge.read(id));}catch{window.close();}}
 });
 handle('workspace-read',(_,event)=>{const id=[...overlays].find(([,window])=>window.webContents===event.sender)?.[0];if(!id)throw Error('Mini pencere bulunamadı.');return workspaceBridge.read(id);});
@@ -113,6 +114,9 @@ handle('notify',notify);
 handle('notification-settings',()=>process.platform==='win32'?shell.openExternal('ms-settings:notifications'):false);
 setInterval(()=>{if(history.enabled)capture({automatic:true}).catch(()=>{});for(const item of reminders){if(item.at<=Date.now()&&!delivered.has(item.id)&&canNotify(policy,'reminder')){if(notify({title:'MONO · Hatırlatma',body:item.text,category:'reminder'})){delivered.add(item.id);persistHistory().catch(()=>{});}}}},750);
 app.on('before-quit',()=>{quitting=true;});
-await win.loadURL(origin);
+island=await installIsland({main:win,origin,test:process.env.MONO_DESKTOP_TEST==='1'});if(lastWorkspace)island.publishWorkspace(lastWorkspace);
+// The local clock and native controls must start even when the dashboard is offline.
+// did-fail-load above presents the existing connection error in the main window.
+await win.loadURL(origin).catch(()=>{});
 }
 if(primary)start().catch(error=>{console.error('MONO başlatılamadı:',error.message);app.exit(1);});

@@ -1,10 +1,9 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {join} from 'node:path';
-import {extractFile} from '@electron/asar';
+import {verifyDesktop} from './verify-desktop.mjs';
 const require=createRequire(import.meta.url),yaml=require('js-yaml');
-const pkg=JSON.parse(await readFile('package.json','utf8'));
+const pkg=await verifyDesktop();
 const metadata=yaml.load(await readFile('release/latest.yml','utf8'));
 if(metadata.version!==pkg.version)throw Error('Release metadata version differs from package.json.');
 const file=metadata.files?.find(file=>file.url.endsWith('.exe'));
@@ -12,11 +11,4 @@ if(!file||/[\\/]/.test(file.url))throw Error('Missing or unsafe installer filena
 const installer=await readFile('release/'+file.url);
 if(createHash('sha512').update(installer).digest('base64')!==file.sha512)throw Error('Installer checksum mismatch.');
 await readFile('release/'+file.url+'.blockmap');
-const config=yaml.load(await readFile('release/win-unpacked/resources/app-update.yml','utf8'));
-if(config.provider!=='github'||config.owner!=='EmreeKucuk'||config.repo!=='mono')throw Error('Unexpected update feed.');
-const archive='release/win-unpacked/resources/app.asar';
-const packaged=JSON.parse(extractFile(archive,'package.json'));
-if(packaged.version!==pkg.version||!packaged.dependencies?.['electron-updater'])throw Error('Missing packaged update dependency.');
-extractFile(archive,join('node_modules','electron-updater','out','main.js'));
-extractFile(archive,join('desktop','updates.mjs'));
 console.log(`Verified ${pkg.version}: installer SHA-512, blockmap and GitHub feed.`);

@@ -1,6 +1,6 @@
 {
   "name": "mono-workspace",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,8 +13,13 @@
     "desktop:dev": "node desktop/dev.mjs",
     "desktop:start": "electron desktop/main.mjs",
     "desktop:build": "electron-builder --win nsis --publish never",
+    "desktop:pack": "electron-builder --win --dir --publish never --config.directories.output=release/island-preview",
     "test:desktop": "node --test tests/desktop.integration.mjs",
-    "predesktop:build": "node scripts/desktop-prepare.mjs"
+    "predesktop:build": "node scripts/desktop-prepare.mjs",
+    "predesktop:pack": "node scripts/desktop-prepare.mjs",
+    "postdesktop:pack": "node scripts/prepare-preview.mjs",
+    "predesktop:dev": "node scripts/desktop-native.mjs",
+    "test:island-desktop": "node --test tests/island.desktop.mjs"
   },
   "devDependencies": {
     "electron": "^44.5.1",
@@ -26,6 +31,7 @@
   },
   "main": "desktop/main.mjs",
   "build": {
+    "npmRebuild": false,
     "appId": "com.mono.dashboard",
     "productName": "MONO",
     "directories": {
@@ -39,7 +45,8 @@
       "public/clipboard-model.js",
       "public/drawing.js",
       "public/ui-utils.js",
-      "public/spotify-url.js"
+      "public/spotify-url.js",
+      "!desktop/native/**"
     ],
     "win": {
       "target": [
@@ -69,7 +76,13 @@
       "repo": "mono",
       "releaseType": "release"
     },
-    "artifactName": "MONO-Setup-${version}.${ext}"
+    "artifactName": "MONO-Setup-${version}.${ext}",
+    "extraResources": [
+      {
+        "from": ".runtime-cache/native-publish/Mono.System.exe",
+        "to": "native/Mono.System.exe"
+      }
+    ]
   },
   "description": "MONO personal workspace desktop companion",
   "author": "MONO",
