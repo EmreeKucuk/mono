@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
+import {spawnSync} from 'node:child_process';
 import {updateFailure} from '../desktop/updates.mjs';
 const require=createRequire(import.meta.url),yaml=require('js-yaml');
 test('update errors explain missing release metadata without leaking upstream credentials',()=>{
@@ -15,10 +16,23 @@ test('release automation supports website publishing and manual repair of empty 
   const workflow=yaml.load(await readFile(new URL('../.github/workflows/release.yml',import.meta.url),'utf8'));
   assert.deepEqual(workflow.on.release.types,['published']);
   assert.equal(workflow.on.workflow_dispatch.inputs.tag.required,true);
-  assert.match(workflow.jobs.release.steps[0].with.ref,/release.tag_name/);
+  const checkout=workflow.jobs.release.steps.find(step=>step.uses==='actions/checkout@v4');
+  assert.equal(checkout.with.ref,'refs/tags/${{ env.RELEASE_TAG }}');
   const upload=workflow.jobs.release.steps.find(step=>step.name?.startsWith('Upload')).run;
   assert.ok(upload.indexOf('"$installer.blockmap"')<upload.indexOf("gh release upload $tag 'release/latest.yml'"));
   assert.match(upload,/assets.Count -gt 0/);assert.ok(!upload.includes('--clobber'));
+});
+
+test('release tag validation runs before checkout and rejects release titles',{skip:process.platform!=='win32'},async()=>{
+  const workflow=yaml.load(await readFile(new URL('../.github/workflows/release.yml',import.meta.url),'utf8'));
+  const steps=workflow.jobs.release.steps,validation=steps.find(step=>step.name==='Validate release tag before checkout');
+  assert.ok(steps.indexOf(validation)<steps.findIndex(step=>step.uses==='actions/checkout@v4'));
+  for(const [tag,valid] of [['v1.4.1',true],['v0.0.0',true],['MONO v1.4.1',false],['',false],['v1.4.1\n',false],['v1.4.1-beta.1',false]]){
+    const result=spawnSync('pwsh',['-NoProfile','-NonInteractive','-Command',validation.run],{env:{...process.env,RELEASE_TAG:tag},encoding:'utf8',windowsHide:true});
+    assert.ifError(result.error);
+    assert.equal(result.status===0,valid,`Tag ${JSON.stringify(tag)}: ${result.stderr}`);
+    if(!valid)assert.match(result.stderr,/Enter an existing Git tag/);
+  }
 });
 
 test('packaging passes a single never policy to the installed Electron Builder parser',async()=>{

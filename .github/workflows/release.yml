@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Build the existing version tag (for example v1.3.0)'
+        description: 'Existing Git tag, e.g. v1.4.1 (not the release title MONO v1.4.1)'
         required: true
         type: string
 permissions:
@@ -25,9 +25,15 @@ jobs:
       MONO_BROWSER_CHANNEL: chromium
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
+      - name: Validate release tag before checkout
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '\Av(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') {
+            throw 'Enter an existing Git tag such as v1.4.1, not the release title MONO v1.4.1. Only stable vMAJOR.MINOR.PATCH tags are supported.'
+          }
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
