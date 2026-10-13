@@ -13,7 +13,11 @@ test('native Island is framed transparently, topmost, sandboxed and restricts IP
     await island.waitForFunction(()=>!!window.monoIsland&&document.querySelector('#compact-clock').textContent.length>0);
     const shape=await desktop.evaluate(({BrowserWindow,screen})=>{const w=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='MONO Island'),p=w.webContents.getLastWebPreferences();return {top:w.isAlwaysOnTop(),resizable:w.isResizable(),background:w.getBackgroundColor(),bounds:w.getBounds(),workArea:screen.getPrimaryDisplay().workArea,sandbox:p.sandbox,context:p.contextIsolation,node:p.nodeIntegration};});
     assert.equal(shape.top,true);assert.equal(shape.resizable,false);assert.equal(shape.sandbox,true);assert.equal(shape.context,true);assert.equal(shape.node,false);
-    assert.equal(shape.background,'#00000000');assert.equal(shape.bounds.x,shape.workArea.x+Math.round((shape.workArea.width-shape.bounds.width)/2));assert.equal(shape.bounds.y,shape.workArea.y+8);
+    // getBackgroundColor returns RGB only, without the alpha channel.
+    assert.equal(shape.background,'#000000');
+    const backgrounds=await island.evaluate(()=>[document.documentElement,document.body].map(element=>getComputedStyle(element).backgroundColor));
+    assert.deepEqual(backgrounds,['rgba(0, 0, 0, 0)','rgba(0, 0, 0, 0)'],'Island document preserves the transparent window background');
+    assert.equal(shape.bounds.x,shape.workArea.x+Math.round((shape.workArea.width-shape.bounds.width)/2));assert.equal(shape.bounds.y,shape.workArea.y+8);
     await island.locator('#summary').hover();await island.waitForFunction(()=>document.querySelector('#island').dataset.open==='true');await island.keyboard.press('Escape');await island.waitForFunction(()=>document.querySelector('#details').inert);
     await assert.rejects(island.evaluate(()=>monoIsland.command({action:'exec',value:'cmd'})));
     const display=await island.evaluate(async()=> (await monoIsland.read()).displayId);
