@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { writeFile, unlink, readFile } from 'node:fs/promises';
+import { writeFile, unlink, readFile, mkdir } from 'node:fs/promises';
 import { getAvailableFormats, convertFile } from '../desktop/island/converter.mjs';
 import { workspaceSummary, islandBounds } from '../desktop/island/model.mjs';
 import { startFocusWatcher } from '../desktop/island/focus.mjs';
@@ -44,6 +44,7 @@ test('islandBounds aligns to the top of the monitor bezel', () => {
 test('converter converts a test image buffer to PNG and JPG', async () => {
   // 1x1 transparent png base64
   const testPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await mkdir(resolve('.test-temp'), { recursive: true });
   const tempFile = resolve('.test-temp', `test-${Date.now()}.png`);
   await writeFile(tempFile, testPng);
 
@@ -60,6 +61,7 @@ test('converter converts a test image buffer to PNG and JPG', async () => {
 });
 
 test('converter converts image using dataUrl directly without external dependencies', async () => {
+  await mkdir(resolve('.test-temp'), { recursive: true });
   const tempFile = resolve('.test-temp', `canvas-test-${Date.now()}.png`);
   await writeFile(tempFile, Buffer.from('dummy-content'));
 
