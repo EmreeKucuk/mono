@@ -12,9 +12,12 @@ export function systemCommand(value){
   throw Error('Geçersiz sistem komutu.');
 }
 export function workspaceSummary(state){
-  return {desk:text(state?.desks?.find(d=>d.id===state.activeDeskId)?.name,80)||'Kişisel alan',events:Array.isArray(state?.events)?state.events.filter(e=>/^\d{4}-\d{2}-\d{2}$/.test(e.date)&&typeof e.text==='string').slice(0,2000).map(e=>({id:text(e.id,100),date:e.date,time:/^\d{2}:\d{2}$/.test(e.time)?e.time:'',text:text(e.text)})):[]};
+  const desk=text(state?.desks?.find(d=>d.id===state.activeDeskId)?.name,80)||'Kişisel alan';
+  const events=Array.isArray(state?.events)?state.events.filter(e=>/^\d{4}-\d{2}-\d{2}$/.test(e.date)&&typeof e.text==='string').slice(0,2000).map(e=>({id:text(e.id,100),date:e.date,time:/^\d{2}:\d{2}$/.test(e.time)?e.time:'',text:text(e.text)})):[];
+  const widgets=Array.isArray(state?.widgets)?state.widgets.map(w=>({id:text(w.id,80),type:text(w.type,30),title:text(w.title,80)||w.type})):[];
+  return {desk,events,widgets};
 }
-export function islandBounds(display){const a=display.workArea,width=Math.min(584,a.width),height=Math.min(660,a.height-12);return {x:a.x+Math.round((a.width-width)/2),y:a.y+8,width,height};}
+export function islandBounds(display){const a=display.bounds||display.workArea||display,width=Math.min(584,a.width),height=Math.min(660,a.height);return {x:a.x+Math.round((a.width-width)/2),y:a.y,width,height};}
 export function insideSurface(point,bounds,hit){
   const x=point.x-bounds.x,y=point.y-bounds.y;
   if(x<hit.x||x>hit.x+hit.width||y<hit.y||y>hit.y+hit.height)return false;

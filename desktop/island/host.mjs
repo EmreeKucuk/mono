@@ -5,10 +5,12 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {EMPTY_SYSTEM,workspaceSummary,islandBounds,insideSurface} from './model.mjs';
 import {startSystemBridge} from './system.mjs';
 import {createVisibilityPreference} from './visibility.mjs';
+import {convertFile} from './converter.mjs';
+import {startFocusWatcher} from './focus.mjs';
 const directory=dirname(fileURLToPath(import.meta.url));
-export async function installIsland({main,origin,test=false}){
-  const file=resolve(app.getPath('userData'),'island.json');let prefs={enabled:true,displayId:null,city:'',theme:'graphite'},weather=null,weatherError='',weatherBusy=false,stopped=false,saveQueue=Promise.resolve();
-  try{const saved=JSON.parse(await readFile(file,'utf8'));prefs={enabled:saved.enabled!==false,displayId:Number.isInteger(saved.displayId)?saved.displayId:null,city:typeof saved.city==='string'?saved.city.slice(0,80):'',theme:saved.theme==='navy'?'navy':'graphite'};if(saved.weather&&Number.isFinite(saved.weather.temperature)&&typeof saved.weather.city==='string')weather=saved.weather;}catch{}
+export async function installIsland({main,origin,test=false,onOpenWidget=null}){
+  const file=resolve(app.getPath('userData'),'island.json');let prefs={enabled:true,displayId:null,city:'',theme:'graphite',microMode:false,focusMode:false,focusModeAuto:true,focusApps:'*'},weather=null,weatherError='',weatherBusy=false,stopped=false,saveQueue=Promise.resolve();
+  try{const saved=JSON.parse(await readFile(file,'utf8'));prefs={enabled:saved.enabled!==false,displayId:Number.isInteger(saved.displayId)?saved.displayId:null,city:typeof saved.city==='string'?saved.city.slice(0,80):'',theme:saved.theme==='navy'?'navy':'graphite',microMode:saved.microMode===true,focusMode:saved.focusMode===true,focusModeAuto:saved.focusModeAuto!==false,focusApps:typeof saved.focusApps==='string'?saved.focusApps.slice(0,200):'*'};if(saved.weather&&Number.isFinite(saved.weather.temperature)&&typeof saved.weather.city==='string')weather=saved.weather;}catch{}
   const persist=()=>{saveQueue=saveQueue.catch(()=>{}).then(async()=>{await mkdir(dirname(file),{recursive:true});await writeFile(file+'.tmp',JSON.stringify({...prefs,weather}));await rename(file+'.tmp',file);});saveQueue.catch(()=>{});return saveQueue;};
   const window=new BrowserWindow({width:584,height:660,frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,maximizable:false,minimizable:false,skipTaskbar:true,alwaysOnTop:true,show:false,title:'MONO Island',webPreferences:{preload:resolve(directory,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}});
   // Electron's default "floating" level moves behind the Windows taskbar,
@@ -16,11 +18,11 @@ export async function installIsland({main,origin,test=false}){
   const keepAbove=()=>{if(!window.isDestroyed())window.setAlwaysOnTop(true,'pop-up-menu');};
   keepAbove();window.on('show',keepAbove);
   const localURL=pathToFileURL(resolve(directory,'index.html')).href;
-  let summary={desk:'Kişisel alan',events:[]},system={...EMPTY_SYSTEM},ready=false,interactive=false,hit={x:162,y:8,width:260,height:54};
+  let summary={desk:'Kişisel alan',events:[],widgets:[]},system={...EMPTY_SYSTEM},ready=false,interactive=false,hit={x:162,y:0,width:260,height:54},currentForeground={process:'',fullscreen:false};
   const displays=()=>screen.getAllDisplays().map(d=>({id:d.id,name:d.label||`Ekran ${d.id}`}));
-  const status=()=>({enabled:prefs.enabled,visible:prefs.enabled&&ready&&!window.isDestroyed()&&window.isVisible(),city:prefs.city,displayId:prefs.displayId});
+  const status=()=>({enabled:prefs.enabled,visible:prefs.enabled&&ready&&!window.isDestroyed()&&window.isVisible(),city:prefs.city,displayId:prefs.displayId,microMode:prefs.microMode===true,focusMode:prefs.focusMode===true});
   const notifyMain=()=>{if(!main.isDestroyed())main.webContents.send('mono:island-status',status());};
-  const snapshot=()=>({theme:prefs.theme,city:prefs.city,weather,weatherError,weatherBusy,summary,system,displays:displays(),displayId:prefs.displayId});
+  const snapshot=()=>({theme:prefs.theme,city:prefs.city,weather,weatherError,weatherBusy,summary,system,displays:displays(),displayId:prefs.displayId,microMode:prefs.microMode===true,focusMode:prefs.focusMode===true,focusModeAuto:prefs.focusModeAuto!==false,focusApps:prefs.focusApps||'*',foreground:currentForeground});
   const publish=()=>{if(ready&&!window.isDestroyed())window.webContents.send('island:state',snapshot());};
   const place=()=>{const display=screen.getAllDisplays().find(d=>d.id===prefs.displayId)||screen.getPrimaryDisplay();prefs.displayId=display.id;window.setBounds(islandBounds(display));keepAbove();publish();};place();
   const refresh=async()=>{
@@ -42,11 +44,17 @@ export async function installIsland({main,origin,test=false}){
   handle('island:settings',isIsland,key=>{if(!Object.hasOwn(settingsLinks,key))throw Error('Geçersiz ayar.');return shell.openExternal(settingsLinks[key]);});
   handle('island:city',isIsland,async city=>{if(typeof city!=='string'||city.trim().length<2||city.length>80)throw Error('Şehir adı 2–80 karakter olmalı.');prefs.city=city.trim();weather=null;weatherError='';await persist();main.webContents.send('mono:island-city',prefs.city);await refresh();return snapshot();});
   handle('island:display',isIsland,async id=>{if(!screen.getAllDisplays().some(d=>d.id===id))throw Error('Ekran bulunamadı.');prefs.displayId=id;place();await persist();return snapshot();});
+  handle('island:open-widget',isIsland,async id=>{if(typeof id!=='string'||!id)throw Error('Geçersiz widget.');if(onOpenWidget)return onOpenWidget(id);main.show();main.focus();return true;});
+  handle('island:convert-file',isIsland,async value=>convertFile(value));
+  handle('island:show-file',isIsland,async path=>{if(typeof path==='string')shell.showItemInFolder(path);return true;});
+  handle('island:micro-mode',isIsland,async value=>{prefs.microMode=value===true;await persist();publish();return snapshot();});
+  handle('island:focus-mode',isIsland,async value=>{prefs.focusMode=value===true;await persist();publish();return snapshot();});
+  handle('island:focus-settings',isIsland,async value=>{if(value&&typeof value.focusModeAuto==='boolean')prefs.focusModeAuto=value.focusModeAuto;if(value&&typeof value.focusApps==='string')prefs.focusApps=value.focusApps.slice(0,200);await persist();publish();return snapshot();});
   handle('mono:island-status',isMain,status);
   handle('mono:island-toggle',isMain,()=>visibility.toggle());
   handle('mono:island-enabled',isMain,value=>visibility.setEnabled(value));
   handle('mono:island-sync',isMain,value=>{let changed=false;if(['graphite','navy'].includes(value?.theme)&&prefs.theme!==value.theme){prefs.theme=value.theme;changed=true;}if(typeof value?.city==='string'&&value.city.length>=2&&value.city.length<=80&&prefs.city!==value.city){prefs.city=value.city;weather=null;changed=true;void refresh();}if(changed){void persist();publish();}return status();});
-  const hitListener=(event,value)=>{if(!isIsland(event)||!value||!['x','y','width','height'].every(k=>Number.isFinite(value[k])))return;const b=window.getBounds();if(value.width<100||value.width>b.width||value.height<30||value.height>b.height||value.x<0||value.y<0||value.x+value.width>b.width+1||value.y+value.height>b.height+1)return;hit=value;};ipcMain.on('island:hit',hitListener);
+  const hitListener=(event,value)=>{if(!isIsland(event)||!value||!['x','y','width','height'].every(k=>Number.isFinite(value[k])))return;const b=window.getBounds();if(value.width<40||value.width>b.width||value.height<3||value.height>b.height||value.x<0||value.y<0||value.x+value.width>b.width+1||value.y+value.height>b.height+1)return;hit=value;};ipcMain.on('island:hit',hitListener);
   window.setMenu(null);window.webContents.setVisualZoomLevelLimits(1,1).catch(()=>{});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.on('did-finish-load',()=>{ready=true;publish();if(prefs.enabled&&!test)window.showInactive();notifyMain();});
@@ -69,7 +77,8 @@ export async function installIsland({main,origin,test=false}){
   screen.on('display-metrics-changed',place);screen.on('display-removed',place);screen.on('display-added',place);powerMonitor.on('resume',resume);
   const shortcut=globalShortcut.register('CommandOrControl+Alt+I',show);
   const timer=setInterval(refresh,1800000);timer.unref();
-  const stop=()=>{if(stopped)return;stopped=true;clearInterval(pointer);clearInterval(timer);native?.stop();screen.removeListener('display-metrics-changed',place);screen.removeListener('display-removed',place);screen.removeListener('display-added',place);powerMonitor.removeListener('resume',resume);ipcMain.removeListener('island:hit',hitListener);handlers.forEach(channel=>ipcMain.removeHandler(channel));if(shortcut)globalShortcut.unregister('CommandOrControl+Alt+I');if(!window.isDestroyed())window.destroy();};
+  const focusWatcher=startFocusWatcher({test,onFocusChange:fg=>{currentForeground=fg;publish();}});
+  const stop=()=>{if(stopped)return;stopped=true;clearInterval(pointer);clearInterval(timer);native?.stop();focusWatcher.stop();screen.removeListener('display-metrics-changed',place);screen.removeListener('display-removed',place);screen.removeListener('display-added',place);powerMonitor.removeListener('resume',resume);ipcMain.removeListener('island:hit',hitListener);handlers.forEach(channel=>ipcMain.removeHandler(channel));if(shortcut)globalShortcut.unregister('CommandOrControl+Alt+I');if(!window.isDestroyed())window.destroy();};
   window.on('close',event=>{if(!stopped){event.preventDefault();if(prefs.enabled)toggle();}});
   window.on('closed',stop);app.once('before-quit',stop);
   await window.loadFile(resolve(directory,'index.html'));void refresh();

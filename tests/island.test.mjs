@@ -15,7 +15,7 @@ test('Island projects only active desk events, clamps system payloads and reject
   assert.deepEqual(systemCommand({action:'audio.volume',value:.4,extra:'discard'}),{action:'audio.volume',value:.4});
 });
 test('Island centres on monitor work area including negative coordinates and ignores transparent corners',()=>{
-  const b=islandBounds({workArea:{x:-1920,y:40,width:1920,height:1040}});assert.equal(b.x,-1252);assert.equal(b.y,48);
+  const b=islandBounds({workArea:{x:-1920,y:40,width:1920,height:1040}});assert.equal(b.x,-1252);assert.equal(b.y,40);
   const hit={x:162,y:8,width:260,height:54};assert.equal(insideSurface({x:b.x+292,y:b.y+35},b,hit),true);assert.equal(insideSurface({x:b.x+162,y:b.y+8},b,hit),false);assert.equal(insideSurface({x:b.x+300,y:b.y+300},b,hit),false);
 });
 test('forecast validates current data and preserves legacy fields while filtering malformed hourly values',()=>{

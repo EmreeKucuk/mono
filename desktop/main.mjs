@@ -94,10 +94,14 @@ handle('workspace-publish',(value,event)=>{
 });
 handle('workspace-read',(_,event)=>{const id=[...overlays].find(([,window])=>window.webContents===event.sender)?.[0];if(!id)throw Error('Mini pencere bulunamadı.');return workspaceBridge.read(id);});
 handle('workspace-commit',(value,event)=>{const id=[...overlays].find(([,window])=>window.webContents===event.sender)?.[0];if(!id)throw Error('Mini pencere bulunamadı.');const result=workspaceBridge.commit(id,value);win.webContents.send('mono:overlay-edit',result);return result;});
-handle('workspace-open',async(id,event)=>{
-  if(event.sender!==win.webContents)throw Error('Mini pencereyi ana pencereden aç.');const data=workspaceBridge.read(id),existing=overlays.get(id);if(existing){existing.show();existing.focus();return;}
+async function openWidgetOverlay(id){
+  const data=workspaceBridge.read(id),existing=overlays.get(id);if(existing){existing.show();existing.focus();return;}
   const prefs=data.state.settings,window=new BrowserWindow({width:prefs.overlayWidth,height:prefs.overlayHeight,minWidth:280,minHeight:240,resizable:true,alwaysOnTop:true,title:data.state.widgets[0].title+' · MONO',autoHideMenuBar:true,backgroundColor:'#111312',icon:resolve(folder,'icon.png'),webPreferences:{preload:resolve(folder,'preload.cjs'),additionalArguments:['--mono-origin='+origin,'--mono-version='+app.getVersion(),'--mono-overlay='+id],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,backgroundThrottling:false}});
   overlays.set(id,window);window.on('page-title-updated',event=>{event.preventDefault();window.setTitle(data.state.widgets[0].title+' · MONO');});window.on('closed',()=>overlays.delete(id));window.webContents.setWindowOpenHandler(({url})=>{if(/^https?:\/\//.test(url))shell.openExternal(url);return {action:'deny'};});window.webContents.on('will-navigate',(e,url)=>{if(new URL(url).origin!==origin)e.preventDefault();});await window.loadURL(origin);
+}
+handle('workspace-open',async(id,event)=>{
+  if(event.sender!==win.webContents)throw Error('Mini pencereyi ana pencereden aç.');
+  return openWidgetOverlay(id);
 });
 handle('overlay-top',(value,event)=>{const window=[...overlays.values()].find(w=>w.webContents===event.sender);if(!window||typeof value!=='boolean')throw Error('Geçersiz mini pencere.');window.setAlwaysOnTop(value);return value;});
 handle('overlay-close',(_,event)=>{const window=[...overlays.values()].find(w=>w.webContents===event.sender);window?.close();});
@@ -114,7 +118,7 @@ handle('notify',notify);
 handle('notification-settings',()=>process.platform==='win32'?shell.openExternal('ms-settings:notifications'):false);
 setInterval(()=>{if(history.enabled)capture({automatic:true}).catch(()=>{});for(const item of reminders){if(item.at<=Date.now()&&!delivered.has(item.id)&&canNotify(policy,'reminder')){if(notify({title:'MONO · Hatırlatma',body:item.text,category:'reminder'})){delivered.add(item.id);persistHistory().catch(()=>{});}}}},750);
 app.on('before-quit',()=>{quitting=true;});
-island=await installIsland({main:win,origin,test:process.env.MONO_DESKTOP_TEST==='1'});if(lastWorkspace)island.publishWorkspace(lastWorkspace);
+island=await installIsland({main:win,origin,test:process.env.MONO_DESKTOP_TEST==='1',onOpenWidget:openWidgetOverlay});if(lastWorkspace)island.publishWorkspace(lastWorkspace);
 // The local clock and native controls must start even when the dashboard is offline.
 // did-fail-load above presents the existing connection error in the main window.
 await win.loadURL(origin).catch(()=>{});

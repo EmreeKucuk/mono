@@ -1,9 +1,185 @@
-:root{color-scheme:dark;font:13px 'Segoe UI',system-ui,sans-serif;color:#eef3ee;--panel:#141916;--card:#ffffff05;--line:#ffffff12;--accent:#c2f0a6;--muted:#a2afa5;--surface:rgba(15,21,18,.91);--height:624px}
-:root[data-theme=navy]{--panel:#131e30;--card:#9fc4ff08;--line:#b9d2ff1a;--accent:#aed0ff;--muted:#a3b4cf;--surface:rgba(10,19,34,.92)}
-*{box-sizing:border-box}html,body{margin:0;background:transparent;overflow:hidden}button,input,select{font:inherit}button{color:inherit;cursor:pointer;border:0;background:none}button:disabled{opacity:.4;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}button:hover:not(:disabled){color:var(--accent)}.sprite{position:absolute;width:0;height:0}.icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.sr-only{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
-#island{position:relative;width:calc(100vw - 32px);max-width:552px;height:min(var(--height),calc(100vh - 24px));margin:8px auto 0;isolation:isolate;pointer-events:none}.surface{position:absolute;inset:0;background:linear-gradient(130deg,#b4d5bd0d,transparent 48%),var(--surface);border:1px solid var(--line);border-radius:30px;clip-path:inset(0 calc((100% - 260px)/2) calc(100% - 54px) round 27px);transition:clip-path 260ms cubic-bezier(.22,.8,.22,1);box-shadow:inset 0 1px #ffffff0a;z-index:-1}#hit{position:absolute;top:0;left:50%;transform:translateX(-50%);width:260px;height:54px;border-radius:27px;pointer-events:auto;transition:width 260ms cubic-bezier(.22,.8,.22,1),height 260ms cubic-bezier(.22,.8,.22,1)}#summary{position:absolute;top:0;left:50%;transform:translateX(-50%);width:260px;height:54px;display:flex;align-items:center;justify-content:center;gap:19px;pointer-events:auto;border-radius:27px;transition:opacity 120ms}#compact-clock{font-size:19px;font-weight:600;letter-spacing:1px;font-variant-numeric:tabular-nums}#compact-weather{display:flex;align-items:center;gap:10px;color:var(--accent);font-size:15px;font-weight:500}.separator{height:17px;width:1px;background:var(--line)}
-#details{height:100%;padding:18px 22px 10px;display:flex;flex-direction:column;opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity 130ms,transform 220ms;overflow:auto;scrollbar-width:thin;scrollbar-color:#56635a transparent}#island[data-open=true] .surface{clip-path:inset(0 round 30px)}#island[data-open=true] #hit{width:100%;height:100%}#island[data-open=true] #summary{opacity:0;pointer-events:none}#island[data-open=true] #details{opacity:1;transform:translateY(0);pointer-events:auto;transition-delay:55ms}#island[data-open=false] #details{transition-delay:0ms}
-.island-header,.header-actions,.identity,.section-heading,.date-row,.connection-controls,.volume,.media,.media-controls,footer,.field-row{display:flex;align-items:center}.island-header{justify-content:space-between;gap:8px}.identity{gap:10px;font-size:11px;font-weight:700;letter-spacing:1.5px}.mono-mark{font-size:25px;color:var(--accent)}.desk-name{display:block;margin-top:3px;font-size:10px;font-weight:400;letter-spacing:.2px;color:var(--muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.header-actions{gap:5px}#pin-state{font-size:8px;letter-spacing:1.7px;color:var(--muted);margin-right:5px}.icon-button{width:29px;height:29px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;flex-shrink:0}.icon-button:hover{background:#ffffff08}.date-row{justify-content:space-between;margin:20px 0 17px;gap:10px}#greeting{font-size:11px;color:var(--muted);margin:0 0 3px}h1{font-size:21px;letter-spacing:-.6px;font-weight:500;margin:0}#full-clock{font-size:30px;letter-spacing:-1px;font-weight:300;font-variant-numeric:tabular-nums}.columns{display:grid;grid-template-columns:1.05fr 1fr;gap:12px}.calendar-card,.weather-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px;min-width:0}.section-heading{justify-content:space-between;gap:6px}.section-heading strong{font-weight:600;font-size:11px}.weekdays,#calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;gap:2px}.weekdays{font-size:9px;color:var(--muted);margin:3px 0 5px}.day{height:23px;border-radius:7px;font-size:10px;position:relative}.day.today{box-shadow:inset 0 0 0 1px #a9ccac60}.day.selected{background:var(--accent);color:#142315!important;font-weight:700}.day.has-event:after{content:'';position:absolute;bottom:1px;left:calc(50% - 1px);width:2px;height:2px;background:currentColor;border-radius:50%}.text-button{padding:0;font-size:10px;display:inline-flex;align-items:center;gap:5px}.text-button .icon{width:13px;height:13px}#calendar-open{margin-top:8px;color:var(--muted)}.weather-symbol{width:28px;height:28px;fill:none;stroke:var(--accent);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.temperature{display:flex;align-items:flex-start;margin-top:2px}.temperature strong{font-size:45px;font-weight:300;line-height:1;letter-spacing:-2px}.temperature>span{font-size:25px;font-weight:300}.weather-card p{margin:4px 0;font-size:10px}#weather-range,#weather-status{color:var(--muted);font-size:9px}#forecast{display:flex;justify-content:space-between;margin:12px 0 5px;gap:4px}.forecast-hour{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:10px}.forecast-hour time{color:var(--muted);font-size:9px}.forecast-hour .icon{width:16px;height:16px;color:var(--accent)}#weather-status{display:block;line-height:1.4}#weather-credit{font-size:8px;display:block;margin-top:4px;color:var(--muted);text-decoration:none;pointer-events:none}
-.agenda{margin-top:12px}.agenda .section-heading>strong{font-size:9px;letter-spacing:1.4px;color:var(--muted)}#events{margin-top:7px;height:45px;overflow:auto;scrollbar-width:thin}.event{display:flex;align-items:center;gap:10px;padding:3px 0;width:100%;text-align:left;font-size:11px}.event time{min-width:34px;color:var(--accent);font-variant-numeric:tabular-nums}.event span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.empty-agenda{color:var(--muted);font-size:11px;margin:8px 0}.system-controls{border-top:1px solid var(--line);margin-top:8px;padding-top:10px;display:flex;align-items:center;gap:10px}.connection-controls{gap:7px;flex:1}.system-button{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;flex:1;text-align:left;min-width:0}.system-button span{min-width:0}.system-button strong{font-size:10px;display:block;font-weight:500}.system-button small{font-size:9px;color:var(--muted);display:block;margin-top:2px;max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.system-button.active>.icon{color:var(--accent)}.volume{width:168px;gap:5px}input[type=range]{width:100%;min-width:0;accent-color:var(--accent);cursor:pointer;height:24px}.volume output{font-size:10px;color:var(--muted);min-width:22px;text-align:right}.media{gap:10px;margin-top:12px;padding:9px;border-radius:15px;background:var(--card);border:1px solid var(--line)}.art{position:relative;display:grid;place-items:center;background:linear-gradient(135deg,#adc6b02b,#54695117);width:38px;height:38px;border-radius:9px;overflow:hidden;flex-shrink:0;color:var(--accent)}.art img{position:absolute;width:100%;height:100%;object-fit:cover}.track{flex:1;min-width:0}.track strong,.track span{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.track strong{font-size:11px;font-weight:500}.track span{font-size:9px;color:var(--muted);margin-top:4px}.media-controls{gap:3px}.play{background:var(--accent);color:#132318;border-radius:50%;margin:0 3px}.play:hover:not(:disabled){color:#132318;background:#d8f7c4}.media-controls .icon{width:14px;height:14px}footer{justify-content:space-between;margin-top:auto;padding-top:9px;gap:8px}footer button{color:var(--muted)}.status-dot{width:5px;height:5px;background:var(--accent);border-radius:50%;margin-right:3px}#status{font-size:9px;margin:0;max-width:210px;color:#edc5a6;text-align:center}#settings-panel{padding:18px 0;flex:1}#settings-panel[hidden],#overview[hidden]{display:none}h2{font-size:21px;font-weight:500;letter-spacing:-.5px}#settings-panel p{color:var(--muted);line-height:1.7}#settings-panel label{display:block;font-size:11px;margin:25px 0 8px}.field-row{gap:8px}input:not([type=range]),select{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:11px 12px;color:inherit;min-width:0}#city{width:100%}#display{width:100%}.accent{background:var(--accent);color:#142315;padding:11px 15px;border-radius:10px;font-weight:500}.accent:hover:not(:disabled){color:#142315;background:#d8f7c4}.settings-help{margin:30px 0}
-@media(max-width:430px){:root{--height:624px}#details{padding:15px 14px}.columns{gap:8px}.calendar-card,.weather-card{padding:9px}#pin-state{display:none}.date-row{margin:16px 0}h1{font-size:17px}#full-clock{font-size:22px}.system-controls{flex-wrap:wrap}.connection-controls{width:100%}.volume{width:100%}.track span{max-width:125px}.media-controls{gap:0}.media-controls .icon-button{width:25px}.forecast-hour:nth-child(4){display:none}.temperature strong{font-size:38px}#status{max-width:100px}}
+:root{color-scheme:dark;font:13px 'Segoe UI',system-ui,sans-serif;color:#eef3ee;--panel:#141916;--card:#ffffff07;--line:#ffffff12;--accent:#c2f0a6;--muted:#a2afa5;--surface:rgba(15,21,18,.96);--height:152px}
+:root[data-theme=navy]{--panel:#131e30;--card:#9fc4ff0a;--line:#b9d2ff1a;--accent:#aed0ff;--muted:#a3b4cf;--surface:rgba(10,19,34,.96)}
+*{box-sizing:border-box}html,body{margin:0;background:transparent;overflow:hidden}button,input,select{font:inherit}button{color:inherit;cursor:pointer;border:0;background:none}button:disabled{opacity:.4;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}button:hover:not(:disabled){color:var(--accent)}.sprite{position:absolute;width:0;height:0}.icon{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.sr-only{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}.sr-data{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
+.compat-hidden{position:absolute;bottom:0;right:0;width:12px;height:12px;opacity:.01;overflow:hidden;pointer-events:auto;z-index:9999}
+.compat-hidden .day{width:12px;height:12px;padding:0;font-size:8px;position:relative}
+
+#island{position:relative;width:calc(100vw - 32px);max-width:510px;height:min(var(--height),calc(100vh - 8px));margin:0 auto;top:0;isolation:isolate;pointer-events:none}
+.surface{position:absolute;top:0;left:50%;transform:translateX(-50%);width:180px;height:34px;background:var(--surface);border:1px solid var(--line);border-top:none;border-radius:0 0 17px 17px;box-shadow:0 4px 20px rgba(0,0,0,.45),inset 0 -1px 0 rgba(255,255,255,.05);transition:width 260ms cubic-bezier(.16,1,.3,1),height 260ms cubic-bezier(.16,1,.3,1),border-radius 260ms cubic-bezier(.16,1,.3,1);z-index:-1;backdrop-filter:blur(24px)}
+.ear{position:absolute;top:0;width:16px;height:16px;overflow:hidden;pointer-events:none}
+.ear-left{left:-16px}.ear-left::before{content:'';position:absolute;top:0;right:0;width:32px;height:32px;border-radius:50%;box-shadow:16px -16px 0 0 var(--surface)}
+.ear-right{right:-16px}.ear-right::before{content:'';position:absolute;top:0;left:0;width:32px;height:32px;border-radius:50%;box-shadow:-16px -16px 0 0 var(--surface)}
+
+#hit{position:absolute;top:0;left:50%;transform:translateX(-50%);width:180px;height:34px;border-radius:0 0 17px 17px;pointer-events:auto;transition:width 260ms cubic-bezier(.16,1,.3,1),height 260ms cubic-bezier(.16,1,.3,1)}
+
+/* Kapalı Kompakt Ada (Coucou Notch) */
+#summary{position:absolute;top:0;left:50%;transform:translateX(-50%);width:180px;height:34px;display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:auto;border-radius:0 0 17px 17px;transition:opacity 140ms,width 260ms,height 260ms;padding:0 12px;overflow:hidden}
+#compact-clock{font-size:13px;font-weight:600;letter-spacing:1px;font-variant-numeric:tabular-nums;color:#f0f5f0}
+#micro-toggle{width:6px;height:6px;border-radius:50%;background:var(--muted);opacity:0;transition:all 160ms;cursor:pointer;padding:0;flex-shrink:0;display:inline-block}
+#summary:hover #micro-toggle{opacity:.6}
+#micro-toggle:hover{opacity:1!important;background:var(--accent);transform:scale(1.4)}
+#micro-pill{display:none}
+.separator{height:12px;width:1px;background:var(--line);display:none}
+
+/* Tamamen Küçültülmüş Mikro Mod & Geri Büyütme Butonu */
+#island[data-mode=micro][data-open=false] .surface{width:76px;height:16px;border-radius:0 0 8px 8px}
+#island[data-mode=micro][data-open=false] #hit{width:76px;height:20px}
+#island[data-mode=micro][data-open=false] #summary{width:76px;height:16px;opacity:1;pointer-events:auto;padding:0;gap:0}
+#island[data-mode=micro][data-open=false] #compact-clock{display:none!important}
+#island[data-mode=micro][data-open=false] #micro-toggle{display:none!important}
+#island[data-mode=micro][data-open=false] #focus-badge{display:none!important}
+#island[data-mode=micro][data-open=false] #micro-pill{display:flex;align-items:center;justify-content:center;width:100%;height:100%;cursor:pointer}
+#island[data-mode=micro][data-open=false] .micro-dot{width:22px;height:4px;border-radius:2px;background:var(--muted);transition:all 160ms}
+#island[data-mode=micro][data-open=false] #summary:hover .micro-dot{background:var(--accent);transform:scaleX(1.3);box-shadow:0 0 8px var(--accent)}
+#island[data-mode=micro][data-open=false] .ear{opacity:.3}
+
+/* Genişletilmiş Ada: Coucou 1/3 Kompakt Boyut (~152px) */
+#island[data-open=true] .surface{width:100%;height:152px;border-radius:0 0 20px 20px}
+#island[data-open=true] #hit{width:100%;height:152px}
+#island[data-open=true] #summary{opacity:0;pointer-events:none}
+#details{position:relative;height:152px;padding:6px 12px 10px;display:flex;flex-direction:column;justify-content:space-between;opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity 140ms,transform 240ms cubic-bezier(.16,1,.3,1);overflow:hidden;max-width:100%;box-sizing:border-box}
+#island[data-open=true] #details{opacity:1;transform:translateY(0);pointer-events:auto;transition-delay:40ms}
+#island[data-open=false] #details{transition-delay:0ms}
+
+/* Header & Sayfa Butonları */
+.island-header{display:flex;align-items:center;justify-content:space-between;gap:6px;height:24px;flex-shrink:0;padding-bottom:4px;border-bottom:1px solid var(--line);min-width:0;max-width:100%}
+.desk-name{display:none}
+.page-pills{display:flex;gap:3px;background:rgba(255,255,255,.05);padding:2px;border-radius:10px;border:1px solid var(--line);min-width:0}
+.pill{padding:2px 7px;font-size:9px;font-weight:500;border-radius:8px;display:inline-flex;align-items:center;gap:4px;color:var(--muted);transition:all 160ms;white-space:nowrap}
+.pill .icon{width:11px;height:11px}
+.pill:hover{color:#fff;background:rgba(255,255,255,.06)}
+.pill.active{background:rgba(255,255,255,.12);color:var(--accent);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.header-actions{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.icon-button{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0;color:var(--muted);transition:all 140ms}
+.icon-button:hover{background:#ffffff10;color:#fff}
+
+/* Carousel ve Sayfalar (Footer kaldırıldı, tam yükseklik) */
+#overview{height:106px;flex:1;flex-shrink:0;display:flex;flex-direction:column;min-height:0;margin-top:2px;overflow:hidden;max-width:100%;min-width:0}
+#carousel-viewport{width:100%;height:100%;flex:1;overflow:hidden;position:relative;max-width:100%;min-width:0}
+#carousel-track{display:flex;width:300%;height:100%;transition:transform 320ms cubic-bezier(.16,1,.3,1)}
+.page-slide{width:33.333333%;flex-shrink:0;height:100%;box-sizing:border-box;overflow:hidden;padding:0 2px;min-width:0}
+
+/* Sayfa 1: Kompakt Tarih & Hava Durumu (Büyük ve Okunabilir Punto) */
+.compact-date-weather{display:flex;align-items:center;justify-content:space-between;gap:12px;height:100%;padding:4px 6px}
+.date-time-card{display:flex;flex-direction:column;gap:2px}
+.compact-time{font-size:36px;font-weight:300;letter-spacing:-0.8px;line-height:1;font-variant-numeric:tabular-nums}
+.date-meta{display:flex;flex-direction:column;gap:2px}
+.compact-date{font-size:13px;font-weight:600;margin:0;color:#f0f5f0;white-space:nowrap}
+.compact-greeting{font-size:10px;color:var(--muted);margin:0}
+.weather-compact-card{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 12px;min-width:0}
+.weather-main{display:flex;align-items:center;gap:8px}
+.temperature{display:flex;align-items:flex-start}
+.temperature strong{font-size:36px;font-weight:300;line-height:1;letter-spacing:-1px}
+.temperature>span{font-size:20px;font-weight:300}
+.weather-symbol{width:28px;height:28px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.weather-meta{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--muted);min-width:0}
+.weather-city-row{display:flex;align-items:center;gap:4px}
+#city-open{font-weight:600;color:#fff;padding:0;font-size:11px}
+#weather-summary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:105px;font-size:10px}
+#weather-range{font-size:9px}
+#weather-status{font-size:8px;color:var(--muted);display:none}
+
+/* Sayfa 2: Kompakt Medya & Sistem */
+.compact-media-system{display:flex;align-items:center;justify-content:space-between;gap:8px;height:100%;padding:2px 2px}
+.featured-media{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 8px;flex:1.1;min-width:0}
+.art{position:relative;display:grid;place-items:center;background:linear-gradient(135deg,#adc6b02b,#54695117);width:34px;height:34px;border-radius:8px;overflow:hidden;flex-shrink:0;color:var(--accent)}
+.art img{position:absolute;width:100%;height:100%;object-fit:cover}
+.track{flex:1;min-width:0}
+.track strong,.track span{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.track strong{font-size:11px;font-weight:600}
+.track span{font-size:9px;color:var(--muted);margin-top:2px}
+.media-controls{display:flex;align-items:center;gap:2px}
+.play{background:var(--accent);color:#132318;border-radius:50%;margin:0 2px}
+.play:hover:not(:disabled){color:#132318;background:#d8f7c4}
+.compact-system-col{display:flex;flex-direction:column;gap:3px;flex:0.9;min-width:0}
+.connection-controls{display:flex;gap:4px}
+.system-button{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:8px;padding:3px 6px;flex:1;text-align:left;min-width:0}
+.system-button small{font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.system-button.active>.icon{color:var(--accent)}
+.volume{display:flex;align-items:center;width:100%;gap:4px}
+input[type=range]{width:100%;min-width:0;accent-color:var(--accent);cursor:pointer;height:18px}
+.volume output{font-size:9px;color:var(--muted);min-width:18px;text-align:right}
+
+/* Sayfa 3: Masaüstü Widget'ları (Full Fill Modu) */
+.compact-widgets-wrap{display:flex;align-items:stretch;height:100%;width:100%;padding:2px 4px 6px;position:relative;min-width:0;box-sizing:border-box}
+.widget-icon-row{display:flex;align-items:stretch;justify-content:stretch;gap:8px;width:100%;flex:1;min-height:0;min-width:0}
+.widget-box{flex:1 1 0;min-width:0;height:100%;border-radius:12px;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex-shrink:0;cursor:pointer;transition:all 180ms cubic-bezier(.2,.8,.2,1);position:relative;padding:4px 6px;box-sizing:border-box}
+.widget-box:hover{background:rgba(255,255,255,.12);border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.widget-box .icon{width:26px;height:26px;color:var(--accent);transition:transform 160ms}
+.widget-box:hover .icon{transform:scale(1.12)}
+.widget-box-label{font-size:10px;font-weight:500;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.widget-box .pin-dot{position:absolute;top:5px;right:5px;width:4px;height:4px;border-radius:50%;background:var(--accent);opacity:.7}
+.empty-widgets{color:var(--muted);font-size:11px;text-align:center;margin:auto}
+
+/* Sürükle-Bırak Dosya Dönüştürücü Kutucuklar Sayfası */
+#drop-overlay{position:absolute;inset:0;background:rgba(10,14,12,.97);border-radius:0 0 20px 20px;padding:8px 12px;display:flex;flex-direction:column;justify-content:space-between;z-index:60;backdrop-filter:blur(28px);border:1.5px solid var(--accent);box-shadow:0 6px 28px rgba(0,0,0,.6);pointer-events:auto;box-sizing:border-box}
+#drop-overlay[hidden]{display:none}
+.drop-card{display:flex;flex-direction:column;justify-content:space-between;height:100%;width:100%;pointer-events:auto}
+.drop-header{display:flex;align-items:center;gap:8px;pointer-events:auto}
+.convert-icon{width:20px;height:20px;color:var(--accent)}
+.drop-meta{flex:1;min-width:0}
+.drop-meta strong{display:block;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drop-meta span{display:block;font-size:9px;color:var(--muted)}
+.drop-boxes{display:flex;align-items:center;justify-content:center;gap:10px;margin:auto 0;pointer-events:auto}
+.drop-box{min-width:80px;height:56px;border-radius:12px;background:rgba(255,255,255,.06);border:1.5px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:all 160ms cubic-bezier(.16,1,.3,1);cursor:pointer;padding:4px 8px;text-align:center;pointer-events:auto}
+.drop-box *{pointer-events:none}
+.drop-box:hover,.drop-box.box-dragover{border-color:var(--accent);background:rgba(194,240,166,.18);transform:scale(1.06);box-shadow:0 4px 16px rgba(194,240,166,.3)}
+.drop-box strong{font-size:13px;font-weight:700;color:#fff;letter-spacing:.4px}
+.drop-box small{font-size:8px;color:var(--muted)}
+.drop-box.box-active-converting{border-color:var(--accent);background:rgba(194,240,166,.15);border-style:solid}
+.drop-box.box-success{border-color:var(--accent);background:rgba(194,240,166,.2);border-style:solid}
+.drop-status-bar{display:flex;align-items:center;justify-content:space-between;height:20px;pointer-events:auto}
+.status-badge{font-size:10px;color:var(--accent);font-weight:600}
+#drop-close,#drop-show-btn{pointer-events:auto;cursor:pointer}
+
+/* Fokus Modu (Kilitli / Tam Ekran) */
+#focus-badge, .focus-badge{width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;color:var(--accent);padding:0;cursor:pointer;opacity:.9;transition:all 160ms;margin-left:2px;flex-shrink:0}
+#focus-badge[hidden], .focus-badge[hidden]{display:none!important}
+#focus-badge:hover, .focus-badge:hover{transform:scale(1.2);color:#fff}
+#focus-badge .icon, .focus-badge .icon{width:12px;height:12px}
+#focus-mode-btn.active{color:var(--accent);background:rgba(255,255,255,.1)}
+#island[data-focus=true] .surface{box-shadow:0 0 10px rgba(194,240,166,.35),0 4px 20px rgba(0,0,0,.5)}
+
+/* Footer kaldırıldı */
+footer{display:none}
+
+/* Ayarlar Paneli (Coucou Kompakt ~152px) */
+#settings-panel{position:absolute;inset:0;background:var(--surface);z-index:40;padding:6px 12px 10px;display:flex;flex-direction:column;box-sizing:border-box;border-radius:0 0 20px 20px;overflow:hidden}
+#settings-panel[hidden],#overview[hidden]{display:none}
+.settings-header{display:flex;align-items:center;justify-content:space-between;height:24px;flex-shrink:0;padding-bottom:3px;border-bottom:1px solid var(--line)}
+.settings-header h2{font-size:11px;font-weight:700;color:#fff;margin:0;letter-spacing:0.5px}
+.mini-btn{width:20px;height:20px;padding:0;font-size:11px}
+.settings-content{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 2px 2px 0;display:flex;flex-direction:column;gap:6px}
+.settings-content::-webkit-scrollbar{width:4px}
+.settings-content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:4px}
+.settings-group{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:4px}
+.settings-group:last-child{border-bottom:none}
+.settings-label{display:block;font-size:9px;font-weight:600;color:var(--muted);margin-bottom:2px}
+.widget-options-list{display:flex;flex-wrap:wrap;gap:4px;max-height:48px;overflow-y:auto}
+.widget-options-list::-webkit-scrollbar{width:3px}
+.widget-options-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+.widget-option-chip{padding:2px 7px;border-radius:7px;font-size:9px;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--muted);cursor:pointer;transition:all 140ms;display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.widget-option-chip:hover{color:#fff;border-color:rgba(255,255,255,.25)}
+.widget-option-chip.active{background:rgba(194,240,166,.18);border-color:var(--accent);color:#fff;font-weight:600}
+.check-row{display:flex;align-items:center;gap:6px;font-size:9px;cursor:pointer;color:#ddd;margin:0}
+.check-row input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px;cursor:pointer}
+.field-row{display:flex;gap:4px;align-items:center}
+input:not([type=range]),select{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:3px 6px;color:inherit;min-width:0;font-size:10px;height:22px;box-sizing:border-box}
+#city,#display,#focus-apps{flex:1;width:100%}
+.text-btn{padding:3px 8px;border-radius:6px;font-weight:600;font-size:9px;height:22px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.accent{background:var(--accent);color:#142315}
+.accent:hover:not(:disabled){color:#142315;background:#d8f7c4}
+
+@media(max-width:430px){
+  #details{padding:4px 6px;max-width:100%}
+  .island-header{gap:2px}
+  .desk-name{display:none}
+  .page-pills{padding:1px;gap:1px}
+  .pill{padding:2px 4px}
+  .pill span{display:none}
+  .compact-date-weather{gap:6px}
+  .compact-time{font-size:22px}
+  .compact-media-system{flex-direction:column;height:auto}
+  #status{max-width:80px}
+}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}

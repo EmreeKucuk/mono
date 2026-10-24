@@ -17,7 +17,7 @@ test('native Island is framed transparently, topmost, sandboxed and restricts IP
     assert.equal(shape.background,'#000000');
     const backgrounds=await island.evaluate(()=>[document.documentElement,document.body].map(element=>getComputedStyle(element).backgroundColor));
     assert.deepEqual(backgrounds,['rgba(0, 0, 0, 0)','rgba(0, 0, 0, 0)'],'Island document preserves the transparent window background');
-    assert.equal(shape.bounds.x,shape.workArea.x+Math.round((shape.workArea.width-shape.bounds.width)/2));assert.equal(shape.bounds.y,shape.workArea.y+8);
+    assert.equal(shape.bounds.x,shape.workArea.x+Math.round((shape.workArea.width-shape.bounds.width)/2));assert.equal(shape.bounds.y,shape.workArea.y);
     await island.locator('#summary').hover();await island.waitForFunction(()=>document.querySelector('#island').dataset.open==='true');await island.keyboard.press('Escape');await island.waitForFunction(()=>document.querySelector('#details').inert);
     await assert.rejects(island.evaluate(()=>monoIsland.command({action:'exec',value:'cmd'})));
     const display=await island.evaluate(async()=> (await monoIsland.read()).displayId);
