@@ -1,7 +1,7 @@
 :root{color-scheme:dark;font:13px 'Segoe UI',system-ui,sans-serif;color:#eef3ee;--panel:#141916;--card:#ffffff07;--line:#ffffff12;--accent:#c2f0a6;--muted:#a2afa5;--surface:rgba(15,21,18,.96);--height:152px}
 :root[data-theme=navy]{--panel:#131e30;--card:#9fc4ff0a;--line:#b9d2ff1a;--accent:#aed0ff;--muted:#a3b4cf;--surface:rgba(10,19,34,.96)}
 *{box-sizing:border-box}html,body{margin:0;background:transparent;overflow:hidden}button,input,select{font:inherit}button{color:inherit;cursor:pointer;border:0;background:none}button:disabled{opacity:.4;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}button:hover:not(:disabled){color:var(--accent)}.sprite{position:absolute;width:0;height:0}.icon{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.sr-only{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}.sr-data{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
-.compat-hidden{position:absolute;top:4px;right:60px;width:140px;height:28px;opacity:.01;overflow:hidden;pointer-events:auto;z-index:9999}
+.compat-hidden{position:absolute;top:50px;left:20px;width:140px;height:28px;opacity:.01;overflow:hidden;pointer-events:auto;z-index:9999}
 .compat-hidden #calendar{display:flex;flex-wrap:wrap;gap:1px}
 .compat-hidden .day{width:14px;height:14px;padding:0;font-size:8px;display:inline-block}
 

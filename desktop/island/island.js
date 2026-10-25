@@ -91,7 +91,7 @@ function isWriting(){
 
 function scheduleClose(){
   clearTimeout(enterTimer);clearTimeout(leaveTimer);
-  leaveTimer=setTimeout(()=>{if(pendingLeave&&expanded&&!isWriting()&&$('#drop-overlay').hidden)open(false);},260);
+  leaveTimer=setTimeout(()=>{if(pendingLeave&&expanded&&!isWriting()&&$('#drop-overlay').hidden)open(false);},380);
 }
 
 function pointer(inside){
